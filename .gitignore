@@ -1,0 +1,21 @@
+# PyInstaller Build folders
+build/
+dist/
+*.spec
+
+# Local Logs
+logs/
+
+# Portable OCR Binaries
+tesseract/
+Tesseract-OCR/
+
+# Python compiled cache
+**/__pycache__/
+*.pyc
+
+# IDE configurations
+.idea/
+.vscode/
+.project
+.pydevproject
