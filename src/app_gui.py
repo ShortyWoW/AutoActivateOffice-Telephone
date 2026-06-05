@@ -21,6 +21,25 @@ class AppGui:
         self.root.geometry(WINDOW_GEOMETRY)
         self.root.configure(bg=COLOR_BG)
         
+        # Enable immersive dark mode window title bar on Windows 10/11
+        try:
+            import ctypes
+            self.root.update_idletasks()
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+            if not hwnd:
+                hwnd = self.root.winfo_id()
+            # DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+            # Fallback to DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+            for attr in [20, 19]:
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd,
+                    attr,
+                    ctypes.byref(ctypes.c_int(1)),
+                    ctypes.sizeof(ctypes.c_int)
+                )
+        except Exception as e:
+            logger.debug(f"Failed to set immersive dark mode title bar: {e}")
+        
         # State variables
         self.browser_controller = BrowserController()
         
@@ -284,12 +303,12 @@ class AppGui:
             self.manual_panel.pack_forget()
             self.toggle_btn.config(text="▶ Show Advanced Controls & Log Console")
             self.manual_visible = False
-            self.root.geometry("720x300")
+            self.root.geometry("720x360")
         else:
             self.manual_panel.pack(fill="both", expand=True, pady=5)
             self.toggle_btn.config(text="▼ Hide Advanced Controls & Log Console")
             self.manual_visible = True
-            self.root.geometry("720x620")
+            self.root.geometry("720x680")
  
     def on_start_auto_activation(self):
         """
