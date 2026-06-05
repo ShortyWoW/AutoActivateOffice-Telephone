@@ -78,4 +78,3 @@ jobs:
           3. Double-click `AutoActivateOffice-Telephone.exe` to run the tool.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: pwsh
