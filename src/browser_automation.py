@@ -111,6 +111,8 @@ class BrowserController:
         
         # Method 1: Try finding by ID patterns: otc_0 to otc_8
         for i in range(9):
+            start_char = i * 7 + 1
+            end_char = (i + 1) * 7
             element = self.find_element_by_selectors([
                 (By.ID, f"otc_{i}"),
                 (By.ID, f"txtIID_{i}"),
@@ -120,9 +122,10 @@ class BrowserController:
                 (By.CSS_SELECTOR, f"input[name*='otc_{i}']"),
                 (By.CSS_SELECTOR, f"input[aria-label*='group {i+1}']"),
                 (By.CSS_SELECTOR, f"input[aria-label*='Group {i+1}']"),
-                (By.CSS_SELECTOR, f"input[aria-label*='character {i+1}']")
+                (By.CSS_SELECTOR, f"input[aria-label*='character {start_char}-{end_char}']"),
+                (By.CSS_SELECTOR, f"input[aria-label*='character {start_char}']")
             ])
-            if element:
+            if element and element not in inputs:
                 inputs.append(element)
                 
         # If we found 9 inputs, clear and fill them
