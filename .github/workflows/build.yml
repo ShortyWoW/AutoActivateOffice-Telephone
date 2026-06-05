@@ -52,7 +52,6 @@ jobs:
         Copy-Item -Path "dist\AutoActivateOffice-Telephone.exe" -Destination "dist\AutoActivateOffice-Telephone\"
         Copy-Item -Path "tesseract\*" -Destination "dist\AutoActivateOffice-Telephone\tesseract" -Recurse -Force
         Copy-Item -Path "README.md" -Destination "dist\AutoActivateOffice-Telephone\"
-        Copy-Item -Path "requirements.txt" -Destination "dist\AutoActivateOffice-Telephone\"
       shell: pwsh
 
     - name: Compress Build Artifact

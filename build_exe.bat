@@ -63,7 +63,6 @@ if %ERRORLEVEL% EQU 0 (
     
     echo Copying documentation files...
     copy README.md dist\AutoActivateOffice-Telephone\ >nul
-    copy requirements.txt dist\AutoActivateOffice-Telephone\ >nul
     
     echo Done! You can now copy the "dist\AutoActivateOffice-Telephone" folder to a USB drive.
 ) else (
