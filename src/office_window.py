@@ -1,7 +1,6 @@
 import time
 import win32gui
 import win32con
-import pyautogui
 from PIL import ImageGrab
 from src.logging_setup import logger
 
@@ -73,6 +72,7 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
     Simulates typing the 8 groups of 6 digits into the active window.
     Assumes the user has focused the first input field (Group A).
     """
+    import pyautogui
     # Join all groups into a single 48-digit string
     # In Office activation wizard, typing 6 digits in field A automatically tabs to B, etc.
     full_cid = "".join([str(g).strip() for g in cid_groups if g])

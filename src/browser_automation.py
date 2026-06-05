@@ -1,15 +1,31 @@
 import re
 import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.edge.options import Options as EdgeOptions
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-import selenium.webdriver.edge.service
-import selenium.webdriver.edge.webdriver
-import selenium.webdriver.chrome.service
-import selenium.webdriver.chrome.webdriver
 from src.logging_setup import logger
 from src.config import ACTIVATION_URL, CID_GROUPS, CID_DIGITS_PER_GROUP
+
+# Lazy load selenium imports to optimize application startup time
+webdriver = None
+By = None
+EdgeOptions = None
+ChromeOptions = None
+
+def _init_selenium():
+    global webdriver, By, EdgeOptions, ChromeOptions
+    if webdriver is None:
+        logger.info("Lazy-loading Selenium dependencies...")
+        from selenium import webdriver as _webdriver
+        from selenium.webdriver.common.by import By as _By
+        from selenium.webdriver.edge.options import Options as _EdgeOptions
+        from selenium.webdriver.chrome.options import Options as _ChromeOptions
+        import selenium.webdriver.edge.service
+        import selenium.webdriver.edge.webdriver
+        import selenium.webdriver.chrome.service
+        import selenium.webdriver.chrome.webdriver
+        webdriver = _webdriver
+        By = _By
+        EdgeOptions = _EdgeOptions
+        ChromeOptions = _ChromeOptions
+
 
 class BrowserController:
     """
@@ -38,6 +54,7 @@ class BrowserController:
         Launches Edge browser (preferred on Windows) or Chrome as fallback.
         Opens the activation URL and keeps the browser visible.
         """
+        _init_selenium()
         if self.is_alive():
             logger.info("Browser is already running. Bringing focus if possible.")
             try:
@@ -167,6 +184,7 @@ class BrowserController:
         Finds input elements on the Microsoft self-service activation portal
         and enters the 9 groups of 7 digits. Scans iframes if main context fails.
         """
+        _init_selenium()
         if not self.is_alive():
             logger.error("Cannot fill Installation ID: Browser is not running.")
             return False
@@ -260,6 +278,7 @@ class BrowserController:
         the 8 groups of 6 digits representing the Confirmation ID.
         Scans iframes if main context fails.
         """
+        _init_selenium()
         if not self.is_alive():
             logger.error("Cannot scrape Confirmation ID: Browser is not running.")
             return []
@@ -393,6 +412,7 @@ class BrowserController:
         auto-fills the IID, auto-answers the 'number of computers' question,
         and auto-scrapes the CID once it appears.
         """
+        _init_selenium()
         logger.info("Background activation pipeline monitor started.")
         
         iid_filled = False

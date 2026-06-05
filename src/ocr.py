@@ -1,12 +1,25 @@
 import os
 import re
-import numpy as np
-import cv2
 from PIL import Image, ImageGrab, ImageTk
 import tkinter as tk
-import pytesseract
 from src.logging_setup import logger
 from src.config import TESSERACT_SEARCH_PATHS, DIGITS_ONLY_RE, IID_TOTAL_DIGITS, IID_GROUPS, IID_DIGITS_PER_GROUP
+
+# Lazy load heavy dependencies to speed up application startup
+np = None
+cv2 = None
+pytesseract = None
+
+def _init_ocr_dependencies():
+    global np, cv2, pytesseract
+    if pytesseract is None:
+        logger.info("Lazy-loading heavy OCR dependencies (numpy, cv2, pytesseract)...")
+        import numpy as _np
+        import cv2 as _cv2
+        import pytesseract as _pytesseract
+        np = _np
+        cv2 = _cv2
+        pytesseract = _pytesseract
 
 # Initialize Tesseract executable path
 tesseract_initialized = False
@@ -16,6 +29,7 @@ def init_tesseract():
     Searches for the Tesseract OCR binary in configured search paths
     and registers it with pytesseract.
     """
+    _init_ocr_dependencies()
     global tesseract_initialized
     if tesseract_initialized:
         return True
@@ -134,7 +148,7 @@ class ScreenSniper:
         self.root.deiconify()
         self.callback(None)
 
-def preprocess_image(pil_img: Image.Image) -> np.ndarray:
+def preprocess_image(pil_img: Image.Image) -> "np.ndarray":
     """
     Applies OpenCV preprocessing to optimize image quality for OCR:
     1. Grayscale
@@ -142,6 +156,7 @@ def preprocess_image(pil_img: Image.Image) -> np.ndarray:
     3. Bilateral filter for noise reduction
     4. Otsu's Binary Thresholding
     """
+    _init_ocr_dependencies()
     # Convert PIL Image to OpenCV Grayscale
     open_cv_image = np.array(pil_img)
     if len(open_cv_image.shape) == 3:
