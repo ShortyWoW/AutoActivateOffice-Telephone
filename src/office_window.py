@@ -2,6 +2,7 @@ import time
 import win32gui
 import win32con
 import pyautogui
+from PIL import ImageGrab
 from src.logging_setup import logger
 
 def find_office_wizard_windows():
@@ -45,6 +46,27 @@ def bring_window_to_front(hwnd):
     except Exception as e:
         logger.error(f"Failed to bring window to front: {e}")
         return False
+
+def capture_window_screenshot(hwnd):
+    """
+    Retrieves the coordinates of the specified window and captures it as a PIL Image.
+    """
+    try:
+        rect = win32gui.GetWindowRect(hwnd)
+        x1, y1, x2, y2 = rect
+        width = x2 - x1
+        height = y2 - y1
+        if width <= 0 or height <= 0:
+            logger.error("Invalid window bounds detected.")
+            return None
+            
+        logger.info(f"Capturing window bounds: x1={x1}, y1={y1}, x2={x2}, y2={y2} (Width: {width}, Height: {height})")
+        # Crop the screenshot to window bounds
+        screenshot = ImageGrab.grab(bbox=(x1, y1, x2, y2))
+        return screenshot
+    except Exception as e:
+        logger.error(f"Failed to capture window screenshot: {e}")
+        return None
 
 def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0.02):
     """

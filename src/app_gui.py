@@ -402,9 +402,28 @@ class AppGui:
     # --- Button actions & Background threads ---
     
     def on_capture_iid_clicked(self):
+        self.update_status("Auto-detecting...", "info")
+        logger.info("Attempting auto-detection of Office Activation Wizard...")
+        
+        def auto_ocr_worker():
+            try:
+                from src.ocr import auto_detect_and_ocr
+                groups = auto_detect_and_ocr()
+                if groups:
+                    # Success! Load into GUI
+                    self.root.after(0, lambda: self.on_ocr_complete(groups))
+                else:
+                    # Fallback to ScreenSniper
+                    self.root.after(0, self.fallback_to_sniper)
+            except Exception as e:
+                logger.error(f"Auto-detection worker crashed: {e}")
+                self.root.after(0, self.fallback_to_sniper)
+                
+        threading.Thread(target=auto_ocr_worker, daemon=True).start()
+
+    def fallback_to_sniper(self):
+        logger.info("Auto-detection failed or no valid digits found. Launching manual screen capture overlay.")
         self.update_status("Select region...", "info")
-        logger.info("Launching screen capture overlay.")
-        # Open the sniper overlay
         ScreenSniper(self.root, self.on_snipe_complete)
 
     def on_snipe_complete(self, image):
@@ -486,6 +505,13 @@ class AppGui:
             if success:
                 self.root.after(0, lambda: self.update_status("Browser Active", "success"))
                 self.root.after(0, lambda: logger.info("Browser session launched successfully. Please sign in manually."))
+                # Start the background pipeline monitor
+                monitor_thread = threading.Thread(
+                    target=self.browser_controller.start_monitor_pipeline,
+                    args=(self.get_iid_list, self.on_cid_scraped_callback),
+                    daemon=True
+                )
+                monitor_thread.start()
             else:
                 self.root.after(0, lambda: self.update_status("Launch Failed", "error"))
                 self.root.after(0, lambda: messagebox.showerror(
@@ -495,6 +521,27 @@ class AppGui:
                 ))
                 
         threading.Thread(target=launch_worker, daemon=True).start()
+
+    def on_cid_scraped_callback(self, cid_groups):
+        """
+        Callback triggered when background monitor pipeline successfully scrapes CID.
+        """
+        def gui_update():
+            for i in range(8):
+                self.cid_entries[i].delete(0, tk.END)
+                self.cid_entries[i].insert(0, cid_groups[i])
+            self.update_status("CID Captured", "success")
+            logger.info(f"Automatically scraped Confirmation ID: {''.join(cid_groups)}")
+            
+            # Focus helper app window
+            self.root.deiconify()
+            self.root.focus_force()
+            self.root.lift()
+            
+            # Prompt user to paste into Office Wizard
+            self.on_paste_office_clicked()
+            
+        self.root.after(0, gui_update)
 
     def on_fill_web_clicked(self):
         groups = self.get_iid_list()

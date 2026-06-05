@@ -230,3 +230,71 @@ def parse_iid_digits(digits_str: str) -> list:
                 groups.append("")
                 
     return groups
+
+def auto_detect_and_ocr() -> list:
+    """
+    Finds the Office Activation Wizard, focuses/restores it, takes a screenshot,
+    performs OCR on the entire window, and extracts the 63 digits.
+    Returns list of 9 groups of 7 digits if found, or None.
+    """
+    from src.office_window import find_office_wizard_windows, bring_window_to_front, capture_window_screenshot
+    import time
+    
+    logger.info("Starting automated Office Activation Wizard window detection...")
+    matches = find_office_wizard_windows()
+    if not matches:
+        logger.warning("No Microsoft Office Activation Wizard window was auto-detected.")
+        return None
+        
+    # Take the first window match
+    hwnd, title = matches[0]
+    logger.info(f"Auto-detected Office Wizard window: '{title}' (HWND: {hwnd})")
+    
+    # Force focus and restore if minimized
+    if not bring_window_to_front(hwnd):
+        logger.warning("Failed to bring Office Wizard window to front.")
+        return None
+        
+    # Wait a moment for window redraw
+    time.sleep(0.6)
+    
+    # Capture screenshot of just that window
+    screenshot = capture_window_screenshot(hwnd)
+    if screenshot is None:
+        logger.error("Failed to capture window screenshot.")
+        return None
+        
+    if not init_tesseract():
+        logger.error("OCR cannot proceed: Tesseract is not configured.")
+        return None
+        
+    try:
+        # Preprocess the entire window screenshot
+        processed_img = preprocess_image(screenshot)
+        
+        # Perform OCR on the entire image
+        custom_config = r'--psm 6 -c tessedit_char_whitelist=0123456789'
+        ocr_result = pytesseract.image_to_string(processed_img, config=custom_config)
+        logger.info(f"Raw auto-capture OCR output: {repr(ocr_result)}")
+        
+        # Clean to digits
+        digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
+        logger.info(f"Auto-extracted {len(digits)} digits from window OCR.")
+        
+        # We check if we got exactly 63 digits
+        if len(digits) == IID_TOTAL_DIGITS:
+            logger.info("Successfully extracted 63-digit Installation ID from window OCR!")
+            return parse_iid_digits(digits)
+            
+        # If not 63 digits, check if we can find exactly 9 blocks of 7 digits
+        # This handles cases where other random digits (page numbers, etc) are OCR'd.
+        seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
+        if len(seven_digit_blocks) == 9:
+            logger.info(f"Found exactly 9 blocks of 7 digits in OCR: {seven_digit_blocks}")
+            return seven_digit_blocks
+            
+        logger.warning("Could not locate a clean 63-digit sequence in window OCR. Bailing to sniper fallback.")
+        return None
+    except Exception as e:
+        logger.error(f"Error during auto-window OCR: {e}")
+        return None

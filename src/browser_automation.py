@@ -115,6 +115,7 @@ class BrowserController:
                 inp.clear()
                 inp.send_keys(val)
             logger.info("Successfully filled 9 Installation ID groups in the current frame context.")
+            self._click_next_button()
             return True
 
         # Method 2: If we didn't find all 9 by ID pattern, fall back to finding all text-like inputs
@@ -139,6 +140,7 @@ class BrowserController:
                 inp.clear()
                 inp.send_keys(val)
             logger.info("Discovered and filled 9 input fields via general DOM search.")
+            self._click_next_button()
             return True
             
         # Method 3: Try looking for a single large input box
@@ -155,6 +157,7 @@ class BrowserController:
             single_input.clear()
             single_input.send_keys(full_iid)
             logger.info("Successfully filled Installation ID into single input field.")
+            self._click_next_button()
             return True
 
         return False
@@ -288,6 +291,160 @@ class BrowserController:
             
         logger.warning("Could not automatically locate exactly 8 blocks of 6 digits on the page or inside iframes.")
         return []
+
+    def _click_next_button(self) -> bool:
+        """
+        Attempts to find and click the 'Next' or 'Submit' button in the current frame context.
+        """
+        try:
+            btn = self.find_element_by_selectors([
+                (By.ID, "next-button"),
+                (By.ID, "submit-button"),
+                (By.ID, "nextBtn"),
+                (By.CSS_SELECTOR, "button[type='submit']"),
+                (By.CSS_SELECTOR, "input[type='submit']"),
+                (By.XPATH, "//button[contains(text(), 'Next')]"),
+                (By.XPATH, "//button[contains(text(), 'Submit')]"),
+                (By.XPATH, "//button[contains(text(), 'next')]"),
+                (By.XPATH, "//button[contains(text(), 'submit')]"),
+                (By.XPATH, "//a[contains(text(), 'Next')]")
+            ])
+            if btn:
+                btn.click()
+                logger.info("Clicked 'Next/Submit' button automatically.")
+                return True
+        except Exception as e:
+            logger.debug(f"Could not click next button: {e}")
+        return False
+
+    def _do_answer_question(self) -> bool:
+        """
+        Inner helper to detect questionnaire elements and auto-select standard answer.
+        """
+        try:
+            body_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
+            if "how many" in body_text or "installed on" in body_text or "number of devices" in body_text or "how many computers" in body_text:
+                logger.info("Questionnaire page text detected.")
+                
+                # Check for radio buttons
+                radios = self.driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
+                if radios:
+                    # Look for value "0" or "1"
+                    for r in radios:
+                        val = r.get_attribute("value") or ""
+                        if val == "0" or val == "1":
+                            r.click()
+                            logger.info(f"Selected radio button automatically with value '{val}'.")
+                            self._click_next_button()
+                            return True
+                            
+                    # Fallback: check labels text
+                    labels = self.driver.find_elements(By.TAG_NAME, "label")
+                    for lbl in labels:
+                        lbl_text = lbl.text.lower().strip()
+                        if lbl_text == "0" or lbl_text == "1" or "only one" in lbl_text or "not installed on other" in lbl_text:
+                            lbl.click()
+                            logger.info(f"Clicked radio label: '{lbl.text}'.")
+                            self._click_next_button()
+                            return True
+                            
+                # Check for selects
+                selects = self.driver.find_elements(By.TAG_NAME, "select")
+                for sel in selects:
+                    options = sel.find_elements(By.TAG_NAME, "option")
+                    for opt in options:
+                        val = opt.get_attribute("value") or ""
+                        txt = opt.text.lower().strip()
+                        if val == "0" or val == "1" or txt == "0" or txt == "1":
+                            opt.click()
+                            logger.info(f"Selected dropdown option: '{opt.text}'.")
+                            self._click_next_button()
+                            return True
+        except Exception as e:
+            logger.debug(f"Error in _do_answer_question: {e}")
+        return False
+
+    def _attempt_auto_answer_question(self) -> bool:
+        """
+        Finds and answers the questionnaire page, scanning inside iframes if needed.
+        """
+        if self._do_answer_question():
+            return True
+            
+        try:
+            iframes = self.driver.find_elements(By.TAG_NAME, "iframe")
+            if iframes:
+                for idx, iframe in enumerate(iframes):
+                    try:
+                        self.driver.switch_to.frame(iframe)
+                        if self._do_answer_question():
+                            return True
+                    except Exception as e:
+                        pass
+                    finally:
+                        self.driver.switch_to.default_content()
+        except Exception as e:
+            logger.debug(f"Error scanning iframes for questionnaire: {e}")
+        return False
+
+    def start_monitor_pipeline(self, iid_groups: list, on_cid_scraped_callback) -> None:
+        """
+        Polls the browser in a background loop. Detects when login is complete,
+        auto-fills the IID, auto-answers the 'number of computers' question,
+        and auto-scrapes the CID once it appears.
+        """
+        logger.info("Background activation pipeline monitor started.")
+        
+        iid_filled = False
+        question_answered = False
+        
+        while self.is_alive():
+            time.sleep(1.5)  # Moderate sleep interval to avoid thrashing CPU
+            
+            # 1. Skip check if still on login/auth pages
+            try:
+                current_url = self.driver.current_url.lower()
+                if "login.microsoft" in current_url or "login.live" in current_url or "oauth" in current_url:
+                    continue
+            except Exception:
+                continue
+                
+            # 2. Auto-Fill IID
+            if not iid_filled:
+                try:
+                    current_iid = iid_groups() if callable(iid_groups) else iid_groups
+                    if current_iid and len("".join(current_iid)) == 63:
+                        if self.fill_installation_id(current_iid):
+                            iid_filled = True
+                            logger.info("Auto-fill IID step executed successfully. Monitoring next steps...")
+                            time.sleep(2.0)
+                            continue
+                except Exception as e:
+                    logger.debug(f"Error checking/filling IID: {e}")
+                    
+            # 3. Auto-Answer Questionnaire
+            if iid_filled and not question_answered:
+                try:
+                    if self._attempt_auto_answer_question():
+                        question_answered = True
+                        logger.info("Auto-answered self-service questionnaire step. Monitoring for CID...")
+                        time.sleep(2.0)
+                        continue
+                except Exception as e:
+                    logger.debug(f"Error checking/answering questionnaire: {e}")
+                    
+            # 4. Auto-Scrape CID
+            if iid_filled:
+                try:
+                    cid_groups = self.scrape_confirmation_id()
+                    if cid_groups and len(cid_groups) == 8:
+                        logger.info(f"Auto-scraped Confirmation ID successfully: {cid_groups}")
+                        on_cid_scraped_callback(cid_groups)
+                        break
+                except Exception as e:
+                    logger.debug(f"Error polling for CID: {e}")
+                    
+        logger.info("Background activation pipeline monitor finished.")
 
     def close(self):
         """
