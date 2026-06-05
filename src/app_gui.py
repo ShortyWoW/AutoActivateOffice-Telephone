@@ -542,16 +542,8 @@ class AppGui:
             self.update_status("CID Scraped", "success")
             logger.info(f"Automatically scraped Confirmation ID: {''.join(cid_groups)}")
             
-            # Focus helper app window and sound bell
-            self.root.deiconify()
-            self.root.focus_force()
-            self.root.lift()
-            try:
-                self.root.bell()
-            except Exception:
-                pass
-            
-            logger.info("Confirmation ID loaded into GUI. Click 'Paste to Office Wizard' to finish activation.")
+            # Immediately trigger the auto-paste to the Office Wizard
+            self.on_paste_office_clicked()
             
         self.root.after(0, gui_update)
 
@@ -665,16 +657,6 @@ class AppGui:
                 f"Confirmation ID must be exactly 48 digits (8 groups of 6).\n"
                 f"Current length is {len(full_cid)} digits."
             )
-            return
-
-        # Always require user confirmation
-        confirm = messagebox.askyesno(
-            "Auto-Paste Confirmation ID",
-            "This action will search for the Microsoft Office Activation Wizard, "
-            "bring it to the front, and automatically type the Confirmation ID.\n\n"
-            "Would you like to proceed?"
-        )
-        if not confirm:
             return
 
         self.update_status("Pasting to Office...", "info")
