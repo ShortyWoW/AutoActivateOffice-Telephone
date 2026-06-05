@@ -42,21 +42,7 @@ jobs:
 
     - name: Build Executable with PyInstaller
       run: |
-        pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
-      shell: pwsh
-
-    - name: Package Portable Directory Structure
-      run: |
-        New-Item -ItemType Directory -Force -Path dist\AutoActivateOffice-Telephone\Logs
-        New-Item -ItemType Directory -Force -Path dist\AutoActivateOffice-Telephone\tesseract
-        Copy-Item -Path "dist\AutoActivateOffice-Telephone.exe" -Destination "dist\AutoActivateOffice-Telephone\"
-        Copy-Item -Path "tesseract\*" -Destination "dist\AutoActivateOffice-Telephone\tesseract" -Recurse -Force
-        Copy-Item -Path "README.md" -Destination "dist\AutoActivateOffice-Telephone\"
-      shell: pwsh
-
-    - name: Compress Build Artifact
-      run: |
-        Compress-Archive -Path dist\AutoActivateOffice-Telephone -DestinationPath dist\AutoActivateOffice-Telephone.zip -Force
+        pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --add-data "tesseract;tesseract" --distpath ./dist --workpath ./build src/main.py
       shell: pwsh
 
     - name: Create Release
@@ -66,15 +52,15 @@ jobs:
         name: AutoActivateOffice Telephone Helper v1.0.${{ github.run_number }}
         draft: false
         prerelease: false
-        files: dist/AutoActivateOffice-Telephone.zip
+        files: dist/AutoActivateOffice-Telephone.exe
         body: |
           Auto-generated release for the AutoActivateOffice Telephone Helper.
           
-          This release contains the portable Windows helper application pre-bundled with Tesseract OCR.
+          This release contains the portable Windows helper application as a single, standalone executable pre-bundled with Tesseract OCR.
           
-          ### Installation
-          1. Download the `AutoActivateOffice-Telephone.zip` file below.
-          2. Extract the zip file directly onto your USB flash drive.
-          3. Double-click `AutoActivateOffice-Telephone.exe` to run the tool.
+          ### Running the Application
+          1. Download the `AutoActivateOffice-Telephone.exe` file below.
+          2. Double-click to run the tool. No installation or extraction is required!
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

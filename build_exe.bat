@@ -32,39 +32,17 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
     )
 )
 
-echo Building portable single-file executable using PyInstaller...
-pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
+echo Building portable single-file executable with bundled Tesseract using PyInstaller...
+pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --add-data "tesseract;tesseract" --distpath ./dist --workpath ./build src/main.py
 
 if %ERRORLEVEL% EQU 0 (
     echo.
     echo ============================================================
     echo BUILD COMPLETED SUCCESSFULLY
-    echo Output directory: dist\AutoActivateOffice-Telephone\
+    echo Standalone executable is available at: dist\AutoActivateOffice-Telephone.exe
     echo ============================================================
     echo.
-    echo Creating directories in the distribution folder...
-    if not exist dist\AutoActivateOffice-Telephone mkdir dist\AutoActivateOffice-Telephone
-    if not exist dist\AutoActivateOffice-Telephone\logs mkdir dist\AutoActivateOffice-Telephone\logs
-    if not exist dist\AutoActivateOffice-Telephone\tesseract mkdir dist\AutoActivateOffice-Telephone\tesseract
-    
-    echo Moving single executable into the distribution folder...
-    move dist\AutoActivateOffice-Telephone.exe dist\AutoActivateOffice-Telephone\ >nul
-    
-    echo Copying local Tesseract binaries if present in project root...
-    if exist tesseract\tesseract.exe (
-        xcopy /s /e /y tesseract dist\AutoActivateOffice-Telephone\tesseract\ >nul
-        echo [INFO] Bundled local "tesseract/" binaries into dist folder.
-    ) else if exist Tesseract-OCR\tesseract.exe (
-        xcopy /s /e /y Tesseract-OCR dist\AutoActivateOffice-Telephone\tesseract\ >nul
-        echo [INFO] Bundled local "Tesseract-OCR/" binaries into dist folder.
-    ) else (
-        echo [WARNING] No local Tesseract binaries found in project root. dist/tesseract is empty.
-    )
-    
-    echo Copying documentation files...
-    copy README.md dist\AutoActivateOffice-Telephone\ >nul
-    
-    echo Done! You can now copy the "dist\AutoActivateOffice-Telephone" folder to a USB drive.
+    echo Done! You can now copy the single "dist\AutoActivateOffice-Telephone.exe" file to a USB drive.
 ) else (
     echo.
     echo [ERROR] PyInstaller compilation failed. See above errors.

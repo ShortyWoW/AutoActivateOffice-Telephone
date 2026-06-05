@@ -22,7 +22,14 @@ ACTIVATION_URL = "https://aka.ms/aoh"
 
 # OCR and Tesseract configuration
 # Search order for tesseract binary to support portable USB setups
-TESSERACT_SEARCH_PATHS = [
+TESSERACT_SEARCH_PATHS = []
+if hasattr(sys, "_MEIPASS"):
+    TESSERACT_SEARCH_PATHS.extend([
+        os.path.join(sys._MEIPASS, "tesseract", "tesseract.exe"),
+        os.path.join(sys._MEIPASS, "Tesseract-OCR", "tesseract.exe")
+    ])
+
+TESSERACT_SEARCH_PATHS.extend([
     # 1. Local path relative to the script/EXE (USB portable setups)
     os.path.join(BASE_DIR, "tesseract", "tesseract.exe"),
     os.path.join(BASE_DIR, "Tesseract-OCR", "tesseract.exe"),
@@ -32,7 +39,7 @@ TESSERACT_SEARCH_PATHS = [
     # 2. Program files directories (host fallback)
     r"C:\Program Files\Tesseract-OCR\tesseract.exe",
     r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
-]
+])
 
 # Validation rules
 # Installation ID: 9 groups of 7 digits = 63 digits
