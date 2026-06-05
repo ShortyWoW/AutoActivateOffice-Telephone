@@ -597,6 +597,14 @@ class AppGui:
             self.update_status("CID Scraped", "success")
             logger.info(f"Automatically scraped Confirmation ID: {''.join(cid_groups)}")
             
+            # Minimize browser window to restore focus to our application
+            try:
+                if self.browser_controller.is_alive():
+                    self.browser_controller.driver.minimize_window()
+                    logger.info("Minimized browser window to restore focus to helper application.")
+            except Exception as e:
+                logger.debug(f"Failed to minimize browser window: {e}")
+                
             # Immediately trigger the auto-paste to the Office Wizard
             self.on_paste_office_clicked()
             
