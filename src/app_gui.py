@@ -260,16 +260,36 @@ class AppGui:
             font=("Consolas", 9), insertbackground=COLOR_TEXT, state="disabled"
         )
         self.log_text.pack(fill="both", expand=True)
+
+        # 6. Footer / Copyright Frame
+        footer_frame = tk.Frame(self.root, bg=COLOR_BG, pady=10)
+        footer_frame.pack(side="bottom", fill="x")
+        
+        copyright_lbl = tk.Label(
+            footer_frame, text="© 2026 Nvalab.com | ", fg=COLOR_MUTED, bg=COLOR_BG, font=("Segoe UI", 9)
+        )
+        copyright_lbl.pack(side="left", padx=(15, 0))
+        
+        github_link = tk.Label(
+            footer_frame, text="GitHub Repository", fg=COLOR_ACCENT, bg=COLOR_BG,
+            font=("Segoe UI", 9, "underline"), cursor="hand2"
+        )
+        github_link.pack(side="left")
+        
+        import webbrowser
+        github_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/ShortyWoW/AutoActivateOffice-Telephone"))
  
     def toggle_manual_panel(self):
         if self.manual_visible:
             self.manual_panel.pack_forget()
             self.toggle_btn.config(text="▶ Show Advanced Controls & Log Console")
             self.manual_visible = False
+            self.root.geometry("720x300")
         else:
             self.manual_panel.pack(fill="both", expand=True, pady=5)
             self.toggle_btn.config(text="▼ Hide Advanced Controls & Log Console")
             self.manual_visible = True
+            self.root.geometry("720x620")
  
     def on_start_auto_activation(self):
         """

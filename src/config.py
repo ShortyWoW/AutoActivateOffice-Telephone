@@ -3,7 +3,7 @@ import re
 
 # App Settings
 APP_TITLE = "AutoActivateOffice Telephone Helper"
-WINDOW_GEOMETRY = "720x680"
+WINDOW_GEOMETRY = "720x300"
 
 import sys
 
