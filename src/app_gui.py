@@ -18,7 +18,19 @@ class AppGui:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(APP_TITLE)
-        self.root.geometry(WINDOW_GEOMETRY)
+        
+        # Calculate DPI scale factor dynamically
+        try:
+            self.scale_factor = self.root.winfo_fpixels('1i') / 96.0
+        except Exception:
+            self.scale_factor = 1.0
+            
+        logger.info(f"DPI Scale Factor detected: {self.scale_factor}")
+        self.width = int(720 * self.scale_factor)
+        self.collapsed_height = int(360 * self.scale_factor)
+        self.expanded_height = int(680 * self.scale_factor)
+        
+        self.root.geometry(f"{self.width}x{self.collapsed_height}")
         self.root.configure(bg=COLOR_BG)
         
         # Enable immersive dark mode window title bar on Windows 10/11
@@ -303,12 +315,12 @@ class AppGui:
             self.manual_panel.pack_forget()
             self.toggle_btn.config(text="▶ Show Advanced Controls & Log Console")
             self.manual_visible = False
-            self.root.geometry("720x360")
+            self.root.geometry(f"{self.width}x{self.collapsed_height}")
         else:
             self.manual_panel.pack(fill="both", expand=True, pady=5)
             self.toggle_btn.config(text="▼ Hide Advanced Controls & Log Console")
             self.manual_visible = True
-            self.root.geometry("720x680")
+            self.root.geometry(f"{self.width}x{self.expanded_height}")
  
     def on_start_auto_activation(self):
         """
@@ -625,24 +637,35 @@ class AppGui:
     def on_open_web_clicked(self):
         self.update_status("Launching Browser...", "info")
         
+        # Thread-safe read of IID on the main GUI thread before starting worker threads
+        iid_list = self.get_iid_list()
+        
         def launch_worker():
-            success = self.browser_controller.launch()
-            if success:
-                self.gui_queue.put(lambda: self.update_status("Browser Active", "success"))
-                self.gui_queue.put(lambda: logger.info("Browser session launched successfully. Please sign in manually."))
-                # Start the background pipeline monitor
-                monitor_thread = threading.Thread(
-                    target=self.browser_controller.start_monitor_pipeline,
-                    args=(self.get_iid_list, self.on_cid_scraped_callback),
-                    daemon=True
-                )
-                monitor_thread.start()
-            else:
+            try:
+                success = self.browser_controller.launch()
+                if success:
+                    self.gui_queue.put(lambda: self.update_status("Browser Active", "success"))
+                    self.gui_queue.put(lambda: logger.info("Browser session launched successfully. Please sign in manually."))
+                    # Start the background pipeline monitor
+                    monitor_thread = threading.Thread(
+                        target=self.browser_controller.start_monitor_pipeline,
+                        args=(iid_list, self.on_cid_scraped_callback),
+                        daemon=True
+                    )
+                    monitor_thread.start()
+                else:
+                    self.gui_queue.put(lambda: self.update_status("Launch Failed", "error"))
+                    self.gui_queue.put(lambda: messagebox.showerror(
+                        "Browser Error",
+                        "Failed to launch Chrome or Edge via Selenium.\n"
+                        "Verify your browser is installed or try running the tool again."
+                    ))
+            except Exception as e:
+                logger.error(f"Browser launch worker crashed: {e}", exc_info=True)
                 self.gui_queue.put(lambda: self.update_status("Launch Failed", "error"))
                 self.gui_queue.put(lambda: messagebox.showerror(
-                    "Browser Error",
-                    "Failed to launch Chrome or Edge via Selenium.\n"
-                    "Verify your browser is installed or try running the tool again."
+                    "Browser Launch Error",
+                    f"An error occurred while launching browser:\n\n{e}"
                 ))
                 
         threading.Thread(target=launch_worker, daemon=True).start()
@@ -686,19 +709,23 @@ class AppGui:
         self.update_status("Filling Website...", "info")
         
         def fill_worker():
-            success = self.browser_controller.fill_installation_id(groups)
-            if success:
-                self.gui_queue.put(lambda: self.update_status("IID Filled", "success"))
-            else:
-                # Copy to clipboard fallback
-                copy_iid_groups(groups)
-                self.gui_queue.put(lambda: self.update_status("Manual Paste Req.", "warning"))
-                self.gui_queue.put(lambda: messagebox.showinfo(
-                    "Manual Paste Required",
-                    "The automation could not locate the Installation ID input fields on this page.\n\n"
-                    "Fallback triggered: The Installation ID has been COPIED to your clipboard.\n"
-                    "Please paste it manually into the website fields."
-                ))
+            try:
+                success = self.browser_controller.fill_installation_id(groups)
+                if success:
+                    self.gui_queue.put(lambda: self.update_status("IID Filled", "success"))
+                else:
+                    # Copy to clipboard fallback
+                    copy_iid_groups(groups)
+                    self.gui_queue.put(lambda: self.update_status("Manual Paste Req.", "warning"))
+                    self.gui_queue.put(lambda: messagebox.showinfo(
+                        "Manual Paste Required",
+                        "The automation could not locate the Installation ID input fields on this page.\n\n"
+                        "Fallback triggered: The Installation ID has been COPIED to your clipboard.\n"
+                        "Please paste it manually into the website fields."
+                    ))
+            except Exception as e:
+                logger.error(f"Fill IID worker crashed: {e}", exc_info=True)
+                self.gui_queue.put(lambda: self.update_status("Fill Failed", "error"))
                 
         threading.Thread(target=fill_worker, daemon=True).start()
 
@@ -710,9 +737,13 @@ class AppGui:
             
             # Scrape in thread
             def scrape_worker():
-                cid_groups = self.browser_controller.scrape_confirmation_id()
-                self.gui_queue.put(lambda: self.on_scrape_finish(cid_groups))
-                
+                try:
+                    cid_groups = self.browser_controller.scrape_confirmation_id()
+                    self.gui_queue.put(lambda: self.on_scrape_finish(cid_groups))
+                except Exception as e:
+                    logger.error(f"Scrape CID worker crashed: {e}", exc_info=True)
+                    self.gui_queue.put(lambda: self.update_status("Scrape Failed", "error"))
+                    
             threading.Thread(target=scrape_worker, daemon=True).start()
             return
 
@@ -786,13 +817,26 @@ class AppGui:
         self.update_status("Pasting to Office...", "info")
         
         def paste_worker():
-            success = auto_paste_confirmation_id(groups)
-            if success:
-                self.gui_queue.put(lambda: self.update_status("Office Activated", "success"))
-                self.gui_queue.put(lambda: logger.info("Successfully pasted Confirmation ID to Office Activation Wizard."))
-            else:
-                self.gui_queue.put(lambda: self.update_status("Paste Failed", "warning"))
-                self.gui_queue.put(lambda: self.prompt_manual_paste(groups))
+            try:
+                success = auto_paste_confirmation_id(groups)
+                if success:
+                    self.gui_queue.put(lambda: self.update_status("Office Activated", "success"))
+                    self.gui_queue.put(lambda: logger.info("Successfully pasted Confirmation ID to Office Activation Wizard."))
+                else:
+                    self.gui_queue.put(lambda: self.update_status("Paste Failed", "warning"))
+                    self.gui_queue.put(lambda: self.prompt_manual_paste(groups))
+            except Exception as e:
+                import pyautogui
+                if isinstance(e, pyautogui.FailSafeException):
+                    logger.warning("Keystroke simulation aborted: PyAutoGUI Failsafe triggered by mouse movement.")
+                    self.gui_queue.put(lambda: self.update_status("Paste Aborted", "warning"))
+                    self.gui_queue.put(lambda: messagebox.showwarning(
+                        "Paste Aborted",
+                        "Pasting was aborted because the mouse was moved to the corner of the screen (Failsafe)."
+                    ))
+                else:
+                    logger.error(f"Paste worker crashed: {e}", exc_info=True)
+                    self.gui_queue.put(lambda: self.update_status("Paste Failed", "error"))
                 
         threading.Thread(target=paste_worker, daemon=True).start()
 
@@ -803,7 +847,10 @@ class AppGui:
         # We will create a small countdown window letting the user focus the window manually!
         countdown_win = tk.Toplevel(self.root)
         countdown_win.title("Manual Focus Paste")
-        countdown_win.geometry("380x180")
+        # Scale geometry by the scale factor
+        scaled_w = int(380 * self.scale_factor)
+        scaled_h = int(180 * self.scale_factor)
+        countdown_win.geometry(f"{scaled_w}x{scaled_h}")
         countdown_win.configure(bg=COLOR_CARD)
         countdown_win.attributes("-topmost", True)
         

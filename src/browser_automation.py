@@ -69,6 +69,7 @@ class BrowserController:
         try:
             logger.info("Attempting to launch Microsoft Edge...")
             options = EdgeOptions()
+            options.page_load_strategy = 'eager'
             options.add_argument("--start-maximized")
             options.add_argument("--disable-gpu")
             # Clear user profile data to ensure clean login environment
@@ -83,6 +84,7 @@ class BrowserController:
             # Try Google Chrome fallback
             try:
                 options = ChromeOptions()
+                options.page_load_strategy = 'eager'
                 options.add_argument("--start-maximized")
                 options.add_argument("--disable-gpu")
                 options.add_argument("--incognito")

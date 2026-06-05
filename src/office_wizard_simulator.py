@@ -13,7 +13,16 @@ class OfficeWizardSimulator(tk.Toplevel):
         
         # Set exact window properties to match the real wizard
         self.title("Microsoft Office Activation Wizard")
-        self.geometry("620x560")
+        
+        # Scale window geometry dynamically based on screen DPI
+        try:
+            self.scale_factor = self.winfo_fpixels('1i') / 96.0
+        except Exception:
+            self.scale_factor = 1.0
+            
+        scaled_w = int(620 * self.scale_factor)
+        scaled_h = int(560 * self.scale_factor)
+        self.geometry(f"{scaled_w}x{scaled_h}")
         self.configure(bg="#ffffff")
         self.resizable(False, False)
         
@@ -166,9 +175,11 @@ class OfficeWizardSimulator(tk.Toplevel):
             )
             entry.place(x=x_pos, y=332, width=box_width, height=24)
             
-            # Key bindings for tabbing
+            # Key bindings for tabbing and pasting
             entry.bind("<KeyPress>", lambda e, idx=i: self.on_cid_keypress(e, idx))
             entry.bind("<KeyRelease>", lambda e, idx=i: self.on_cid_keyrelease(e, idx))
+            entry.bind("<Control-v>", lambda e, idx=i: self.on_cid_paste(e, idx))
+            entry.bind("<<Paste>>", lambda e, idx=i: self.on_cid_paste(e, idx))
             
             self.cid_entries.append(entry)
 
@@ -292,3 +303,35 @@ class OfficeWizardSimulator(tk.Toplevel):
             if index < 7:
                 self.cid_entries[index+1].focus_set()
                 self.cid_entries[index+1].icursor(0)
+
+    def on_cid_paste(self, event, index):
+        try:
+            text = self.clipboard_get()
+        except Exception:
+            return "break"
+            
+        digits = "".join(c for c in text if c.isdigit())
+        if not digits:
+            return "break"
+            
+        if len(digits) >= 48:
+            # Full CID paste: distribute starting from box A
+            for i in range(8):
+                self.cid_entries[i].delete(0, tk.END)
+                self.cid_entries[i].insert(0, digits[i*6:(i+1)*6])
+            self.cid_entries[7].focus_set()
+        else:
+            # Sequential paste starting from current field
+            curr_idx = index
+            while digits and curr_idx < 8:
+                chunk = digits[:6]
+                digits = digits[6:]
+                self.cid_entries[curr_idx].delete(0, tk.END)
+                self.cid_entries[curr_idx].insert(0, chunk)
+                if len(chunk) == 6 and curr_idx < 7:
+                    curr_idx += 1
+                else:
+                    break
+            self.cid_entries[curr_idx].focus_set()
+            
+        return "break"

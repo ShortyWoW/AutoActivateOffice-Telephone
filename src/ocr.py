@@ -200,27 +200,35 @@ def perform_ocr(pil_img: Image.Image) -> list:
         # Preprocess the image
         processed_img = preprocess_image(pil_img)
         
-        # Configure Tesseract to recognize only digits in uniform blocks
-        custom_config = r'--psm 6 -c tessedit_char_whitelist=0123456789'
+        # Try multiple PSM options for maximum robustness
+        configs = [
+            r'--psm 6 -c tessedit_char_whitelist=0123456789',  # Primary: Single uniform block
+            r'--psm 11 -c tessedit_char_whitelist=0123456789', # Secondary: Sparse text
+            r'--psm 3 -c tessedit_char_whitelist=0123456789'   # Tertiary: Fully automatic
+        ]
         
-        # Run OCR
-        ocr_result = pytesseract.image_to_string(processed_img, config=custom_config)
-        logger.info(f"Raw OCR Output: {repr(ocr_result)}")
-        
-        # 1. Try finding a clean IID segment in the OCR output
-        iid_from_text = find_iid_in_text(ocr_result)
-        if iid_from_text:
-            return iid_from_text
+        last_ocr_result = ""
+        for config in configs:
+            logger.info(f"Running OCR with config: {config}")
+            ocr_result = pytesseract.image_to_string(processed_img, config=config)
+            logger.info(f"Raw OCR Output: {repr(ocr_result)}")
+            last_ocr_result = ocr_result
             
-        # 2. Check for exactly 9 blocks of 7 digits
-        seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
-        if len(seven_digit_blocks) == 9:
-            return seven_digit_blocks
+            # 1. Try finding a clean IID segment in the OCR output
+            iid_from_text = find_iid_in_text(ocr_result)
+            if iid_from_text:
+                logger.info(f"Successfully extracted IID using config: {config}")
+                return iid_from_text
+                
+            # 2. Check for exactly 9 blocks of 7 digits
+            seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
+            if len(seven_digit_blocks) == 9:
+                logger.info(f"Successfully extracted 9 blocks of 7 digits using config: {config}")
+                return seven_digit_blocks
 
-        # 3. Fallback: Extract all digits
-        digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
-        logger.info(f"Extracted {len(digits)} digits from OCR.")
-        
+        # 3. Fallback: Extract all digits from the last run
+        digits = "".join(DIGITS_ONLY_RE.findall(last_ocr_result))
+        logger.warning(f"All PSM configs failed to find a clean 63-digit sequence. Extracting all {len(digits)} digits from last run.")
         return parse_iid_digits(digits)
     except Exception as e:
         logger.error(f"Error performing OCR: {e}")
@@ -326,34 +334,41 @@ def auto_detect_and_ocr() -> list:
         # Preprocess the entire window screenshot
         processed_img = preprocess_image(screenshot, is_window=True)
         
-        # Perform OCR on the entire image
-        custom_config = r'--psm 6 -c tessedit_char_whitelist=0123456789'
-        ocr_result = pytesseract.image_to_string(processed_img, config=custom_config)
-        logger.info(f"Raw auto-capture OCR output: {repr(ocr_result)}")
+        # Try multiple PSM options for maximum robustness
+        configs = [
+            r'--psm 6 -c tessedit_char_whitelist=0123456789',
+            r'--psm 11 -c tessedit_char_whitelist=0123456789',
+            r'--psm 3 -c tessedit_char_whitelist=0123456789'
+        ]
         
-        # Clean to digits
-        digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
-        logger.info(f"Auto-extracted {len(digits)} digits from window OCR.")
-        
-        # 1. Search for a sequence containing 63 digits (contiguous or separated by whitespace)
-        iid_from_text = find_iid_in_text(ocr_result)
-        if iid_from_text:
-            logger.info("Successfully extracted 63-digit Installation ID from window OCR text!")
-            return iid_from_text
+        for config in configs:
+            logger.info(f"Running auto-capture OCR with config: {config}")
+            ocr_result = pytesseract.image_to_string(processed_img, config=config)
+            logger.info(f"Raw auto-capture OCR output: {repr(ocr_result)}")
             
-        # 2. Check if we can find exactly 9 blocks of 7 digits
-        # This handles cases where other random digits (page numbers, etc) are OCR'd.
-        seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
-        if len(seven_digit_blocks) == 9:
-            logger.info(f"Found exactly 9 blocks of 7 digits in OCR: {seven_digit_blocks}")
-            return seven_digit_blocks
+            # Clean to digits
+            digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
+            logger.info(f"Auto-extracted {len(digits)} digits from window OCR using config: {config}")
+            
+            # 1. Search for a sequence containing 63 digits (contiguous or separated by whitespace)
+            iid_from_text = find_iid_in_text(ocr_result)
+            if iid_from_text:
+                logger.info(f"Successfully extracted 63-digit Installation ID from window OCR text using config: {config}!")
+                return iid_from_text
+                
+            # 2. Check if we can find exactly 9 blocks of 7 digits
+            # This handles cases where other random digits (page numbers, etc) are OCR'd.
+            seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
+            if len(seven_digit_blocks) == 9:
+                logger.info(f"Found exactly 9 blocks of 7 digits in OCR using config: {config}: {seven_digit_blocks}")
+                return seven_digit_blocks
 
-        # 3. Fallback: if all digits in the entire page equal 63, use it
-        if len(digits) == IID_TOTAL_DIGITS:
-            logger.info("Successfully extracted 63-digit Installation ID from window OCR!")
-            return parse_iid_digits(digits)
+            # 3. Fallback: if all digits in the entire page equal 63, use it
+            if len(digits) == IID_TOTAL_DIGITS:
+                logger.info(f"Successfully extracted 63-digit Installation ID from window OCR using config: {config}!")
+                return parse_iid_digits(digits)
             
-        logger.warning("Could not locate a clean 63-digit sequence in window OCR. Bailing to sniper fallback.")
+        logger.warning("Could not locate a clean 63-digit sequence in window OCR after trying all PSM modes. Bailing to sniper fallback.")
         return None
     except Exception as e:
         logger.error(f"Error during auto-window OCR: {e}")

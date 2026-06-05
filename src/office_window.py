@@ -1,6 +1,10 @@
 import time
 import win32gui
 import win32con
+import win32process
+import os
+import ctypes
+from ctypes import wintypes
 from PIL import ImageGrab
 from src.logging_setup import logger, get_window_title
 
@@ -13,31 +17,73 @@ def register_focus_callback(callback):
     global _focus_callback
     _focus_callback = callback
 
+def get_extended_frame_bounds(hwnd):
+    """
+    Retrieves the exact visual bounds (excluding DWM shadows/drop borders) of a window.
+    """
+    try:
+        rect = wintypes.RECT()
+        # DWMWA_EXTENDED_FRAME_BOUNDS = 9
+        hr = ctypes.windll.dwmapi.DwmGetWindowAttribute(
+            hwnd, 9, ctypes.byref(rect), ctypes.sizeof(rect)
+        )
+        if hr == 0:
+            return (rect.left, rect.top, rect.right, rect.bottom)
+    except Exception as e:
+        logger.debug(f"DwmGetWindowAttribute failed: {e}")
+    return None
+
 def find_office_wizard_windows():
     """
     Finds open window handles and titles that match Microsoft Office Activation Wizard.
-    Uses FindWindow to avoid background thread EnumWindows callbacks.
+    Queries all windows to find ones containing relevant activation keywords,
+    excluding our own process to prevent false-positives.
     """
     matches = []
-    for title in [
-        "Microsoft Office Activation Wizard", 
-        "Activation Wizard", 
-        "Office Activation Wizard", 
-        "Microsoft Office Activation"
-    ]:
-        hwnd = win32gui.FindWindow(None, title)
-        if hwnd and win32gui.IsWindowVisible(hwnd):
-            matches.append((hwnd, title))
-            return matches
+    my_pid = os.getpid()
+    
+    def enum_callback(hwnd, extra):
+        if win32gui.IsWindowVisible(hwnd):
+            try:
+                # Exclude our own window
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                if pid == my_pid:
+                    return True
+            except Exception:
+                pass
+                
+            title = get_window_title(hwnd)
+            title_lower = title.lower()
             
+            # Keyword substring check
+            if "activation wizard" in title_lower or ("office" in title_lower and "activation" in title_lower):
+                matches.append((hwnd, title))
+        return True
+        
+    try:
+        win32gui.EnumWindows(enum_callback, None)
+    except Exception as e:
+        logger.error(f"Error enumerating windows for wizard: {e}")
+        
+    # Fallback to exact search if EnumWindows was empty but FindWindow works
+    if not matches:
+        for title in [
+            "Microsoft Office Activation Wizard", 
+            "Activation Wizard", 
+            "Office Activation Wizard", 
+            "Microsoft Office Activation"
+        ]:
+            hwnd = win32gui.FindWindow(None, title)
+            if hwnd and win32gui.IsWindowVisible(hwnd):
+                matches.append((hwnd, title))
+                break
+                
     return matches
 
 def bring_window_to_front(hwnd):
     """
     Brings the window with specified handle to the front, restoring it if minimized.
     """
-    import win32process
-    import os
     try:
         # Check if minimized
         if win32gui.IsIconic(hwnd):
@@ -64,10 +110,16 @@ def bring_window_to_front(hwnd):
 def capture_window_screenshot(hwnd):
     """
     Retrieves the coordinates of the specified window and captures it as a PIL Image.
+    Uses true visual bounds (excluding borders/shadows) if possible.
     """
     try:
-        rect = win32gui.GetWindowRect(hwnd)
-        x1, y1, x2, y2 = rect
+        bounds = get_extended_frame_bounds(hwnd)
+        if bounds:
+            x1, y1, x2, y2 = bounds
+        else:
+            rect = win32gui.GetWindowRect(hwnd)
+            x1, y1, x2, y2 = rect
+            
         width = x2 - x1
         height = y2 - y1
         if width <= 0 or height <= 0:
@@ -89,7 +141,6 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
     """
     import pyautogui
     # Join all groups into a single 48-digit string
-    # In Office activation wizard, typing 6 digits in field A automatically tabs to B, etc.
     full_cid = "".join([str(g).strip() for g in cid_groups if g])
     
     if len(full_cid) != 48:
@@ -97,11 +148,9 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
     
     logger.info("Starting simulation of CID keystrokes...")
     
-    # Temporarily reduce PyAutoGUI's default pause to speed up character entry
     old_pause = pyautogui.PAUSE
     pyautogui.PAUSE = 0.005
     try:
-        # Write the entire string at once with a small delay between characters
         pyautogui.write(full_cid, interval=delay_between_chars)
     finally:
         pyautogui.PAUSE = old_pause
@@ -111,7 +160,7 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
 
 def auto_paste_confirmation_id(cid_groups: list) -> bool:
     """
-    Finds the Office Activation Wizard, brings it to front, and types the CID.
+    Finds the Office Activation Wizard, brings it to front, focuses Box A, and types the CID.
     If no window is found, logs a warning and returns False.
     """
     matches = find_office_wizard_windows()
@@ -127,6 +176,29 @@ def auto_paste_confirmation_id(cid_groups: list) -> bool:
     if bring_window_to_front(hwnd):
         # Small delay to let window focus settle
         time.sleep(0.8)
+        
+        # Focus Box A by clicking it automatically
+        try:
+            import pyautogui
+            import win32gui
+            rect = win32gui.GetWindowRect(hwnd)
+            x1, y1, x2, y2 = rect
+            width = x2 - x1
+            height = y2 - y1
+            if width > 0 and height > 0:
+                # Baseline coordinates for a 620x560 window layout:
+                # Box A center: X = 103, Y = 344
+                click_x = int(x1 + (103 * (width / 620.0)))
+                click_y = int(y1 + (344 * (height / 560.0)))
+                
+                logger.info(f"Auto-clicking Box A at screen coordinates ({click_x}, {click_y}) to set focus...")
+                old_x, old_y = pyautogui.position()
+                pyautogui.click(click_x, click_y)
+                pyautogui.moveTo(old_x, old_y)
+                time.sleep(0.3)
+        except Exception as e:
+            logger.warning(f"Failed to auto-click Box A: {e}")
+            
         # Paste the CID
         return paste_cid_to_focused_window(cid_groups)
     
