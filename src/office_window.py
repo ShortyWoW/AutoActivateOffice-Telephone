@@ -4,6 +4,15 @@ import win32con
 from PIL import ImageGrab
 from src.logging_setup import logger, get_window_title
 
+_focus_callback = None
+
+def register_focus_callback(callback):
+    """
+    Registers a callback to handle focusing local process windows safely from the GUI thread.
+    """
+    global _focus_callback
+    _focus_callback = callback
+
 def find_office_wizard_windows():
     """
     Finds open window handles and titles that match Microsoft Office Activation Wizard.
@@ -40,6 +49,11 @@ def bring_window_to_front(hwnd):
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         if pid != os.getpid():
             win32gui.SetForegroundWindow(hwnd)
+        else:
+            if _focus_callback:
+                _focus_callback(hwnd)
+            else:
+                win32gui.SetForegroundWindow(hwnd)
             
         logger.info(f"Brought window (HWND: {hwnd}) to front.")
         return True

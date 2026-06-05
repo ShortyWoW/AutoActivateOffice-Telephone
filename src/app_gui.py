@@ -2,6 +2,7 @@ import re
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import threading
+import queue
 from src.config import (
     APP_TITLE, WINDOW_GEOMETRY, COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_ACCENT_HOVER,
     COLOR_TEXT, COLOR_MUTED, COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR, COLOR_BORDER
@@ -23,6 +24,10 @@ class AppGui:
         # State variables
         self.browser_controller = BrowserController()
         
+        # Thread-safe message queues to decouple background threads from Tcl/Tk
+        self.log_queue = queue.Queue()
+        self.gui_queue = queue.Queue()
+        
         # Configure root style
         self.root.option_add("*Font", "SegoeUI 10")
         
@@ -32,8 +37,43 @@ class AppGui:
         # Connect logger to our text box
         register_gui_callback(self.append_log)
         
-        logger.info("GUI Initialized.")
+        # Start queue polling loops on main thread
+        self.poll_log_queue()
+        self.poll_gui_queue()
         
+        # Register thread-safe callback to focus local simulator window from main thread
+        from src.office_window import register_focus_callback
+        register_focus_callback(lambda hwnd: self.gui_queue.put(lambda: self.force_local_focus(hwnd)))
+        
+        logger.info("GUI Initialized.")
+
+    def poll_log_queue(self):
+        """Polls log_queue on main GUI thread and appends to GUI console widget."""
+        try:
+            while True:
+                msg = self.log_queue.get_nowait()
+                if hasattr(self, 'log_text') and self.log_text.winfo_exists():
+                    self.log_text.config(state="normal")
+                    self.log_text.insert(tk.END, msg)
+                    self.log_text.see(tk.END)
+                    self.log_text.config(state="disabled")
+        except queue.Empty:
+            pass
+        self.root.after(50, self.poll_log_queue)
+
+    def poll_gui_queue(self):
+        """Polls gui_queue on main GUI thread and executes deferred callbacks."""
+        try:
+            while True:
+                callback = self.gui_queue.get_nowait()
+                try:
+                    callback()
+                except Exception as e:
+                    logger.error(f"Error executing GUI callback: {e}")
+        except queue.Empty:
+            pass
+        self.root.after(30, self.poll_gui_queue)
+
     def create_widgets(self):
         # 1. Header & Status Frame
         header_frame = tk.Frame(self.root, bg=COLOR_BG, pady=10)
@@ -269,15 +309,27 @@ class AppGui:
         """
         Appends a message to the bottom log terminal text widget safely from any thread.
         """
-        def safe_append():
-            if not hasattr(self, 'log_text') or not self.log_text.winfo_exists():
-                return
-            self.log_text.config(state="normal")
-            self.log_text.insert(tk.END, msg)
-            self.log_text.see(tk.END)
-            self.log_text.config(state="disabled")
-            
-        self.root.after(0, safe_append)
+        self.log_queue.put(msg)
+
+    def force_local_focus(self, hwnd):
+        """Safely brings a local process window (e.g. simulator) to the foreground from the main thread."""
+        try:
+            import win32gui
+            import win32con
+            if win32gui.IsWindow(hwnd):
+                win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+                win32gui.SetForegroundWindow(hwnd)
+                win32gui.SetActiveWindow(hwnd)
+                logger.info(f"Focused local window (HWND: {hwnd}) on main thread.")
+                
+                # If it's our simulator window, also ensure the first entry has keyboard focus
+                if hasattr(self, 'simulator_window') and self.simulator_window and self.simulator_window.winfo_exists():
+                    self.simulator_window.focus_force()
+                    if self.simulator_window.cid_entries:
+                        self.simulator_window.cid_entries[0].focus_set()
+                        logger.info("Focused the first Confirmation ID field in simulator.")
+        except Exception as e:
+            logger.error(f"Error focusing local window on main thread: {e}")
 
     # --- Keyboard entry handlers for IID fields ---
     
@@ -423,13 +475,13 @@ class AppGui:
                 groups = auto_detect_and_ocr()
                 if groups:
                     # Success! Load into GUI
-                    self.root.after(0, lambda: self.on_ocr_complete(groups))
+                    self.gui_queue.put(lambda: self.on_ocr_complete(groups))
                 else:
                     # Fallback to ScreenSniper
-                    self.root.after(0, self.fallback_to_sniper)
+                    self.gui_queue.put(self.fallback_to_sniper)
             except Exception as e:
                 logger.error(f"Auto-detection worker crashed: {e}")
-                self.root.after(0, self.fallback_to_sniper)
+                self.gui_queue.put(self.fallback_to_sniper)
                 
         threading.Thread(target=auto_ocr_worker, daemon=True).start()
 
@@ -450,11 +502,11 @@ class AppGui:
         def ocr_worker():
             try:
                 groups = perform_ocr(image)
-                # Run updates on the GUI thread using self.root.after
-                self.root.after(0, lambda: self.on_ocr_complete(groups))
+                # Run updates on the GUI thread using gui_queue
+                self.gui_queue.put(lambda: self.on_ocr_complete(groups))
             except Exception as e:
                 logger.error(f"OCR Worker thread crashed: {e}")
-                self.root.after(0, lambda: self.update_status("OCR Failed", "error"))
+                self.gui_queue.put(lambda: self.update_status("OCR Failed", "error"))
                 
         threading.Thread(target=ocr_worker, daemon=True).start()
 
@@ -515,8 +567,8 @@ class AppGui:
         def launch_worker():
             success = self.browser_controller.launch()
             if success:
-                self.root.after(0, lambda: self.update_status("Browser Active", "success"))
-                self.root.after(0, lambda: logger.info("Browser session launched successfully. Please sign in manually."))
+                self.gui_queue.put(lambda: self.update_status("Browser Active", "success"))
+                self.gui_queue.put(lambda: logger.info("Browser session launched successfully. Please sign in manually."))
                 # Start the background pipeline monitor
                 monitor_thread = threading.Thread(
                     target=self.browser_controller.start_monitor_pipeline,
@@ -525,8 +577,8 @@ class AppGui:
                 )
                 monitor_thread.start()
             else:
-                self.root.after(0, lambda: self.update_status("Launch Failed", "error"))
-                self.root.after(0, lambda: messagebox.showerror(
+                self.gui_queue.put(lambda: self.update_status("Launch Failed", "error"))
+                self.gui_queue.put(lambda: messagebox.showerror(
                     "Browser Error",
                     "Failed to launch Chrome or Edge via Selenium.\n"
                     "Verify your browser is installed or try running the tool again."
@@ -548,7 +600,7 @@ class AppGui:
             # Immediately trigger the auto-paste to the Office Wizard
             self.on_paste_office_clicked()
             
-        self.root.after(0, gui_update)
+        self.gui_queue.put(gui_update)
 
     def on_fill_web_clicked(self):
         groups = self.get_iid_list()
@@ -567,12 +619,12 @@ class AppGui:
         def fill_worker():
             success = self.browser_controller.fill_installation_id(groups)
             if success:
-                self.root.after(0, lambda: self.update_status("IID Filled", "success"))
+                self.gui_queue.put(lambda: self.update_status("IID Filled", "success"))
             else:
                 # Copy to clipboard fallback
                 copy_iid_groups(groups)
-                self.root.after(0, lambda: self.update_status("Manual Paste Req.", "warning"))
-                self.root.after(0, lambda: messagebox.showinfo(
+                self.gui_queue.put(lambda: self.update_status("Manual Paste Req.", "warning"))
+                self.gui_queue.put(lambda: messagebox.showinfo(
                     "Manual Paste Required",
                     "The automation could not locate the Installation ID input fields on this page.\n\n"
                     "Fallback triggered: The Installation ID has been COPIED to your clipboard.\n"
@@ -590,7 +642,7 @@ class AppGui:
             # Scrape in thread
             def scrape_worker():
                 cid_groups = self.browser_controller.scrape_confirmation_id()
-                self.root.after(0, lambda: self.on_scrape_finish(cid_groups))
+                self.gui_queue.put(lambda: self.on_scrape_finish(cid_groups))
                 
             threading.Thread(target=scrape_worker, daemon=True).start()
             return
@@ -667,11 +719,11 @@ class AppGui:
         def paste_worker():
             success = auto_paste_confirmation_id(groups)
             if success:
-                self.root.after(0, lambda: self.update_status("Office Activated", "success"))
-                self.root.after(0, lambda: logger.info("Successfully pasted Confirmation ID to Office Activation Wizard."))
+                self.gui_queue.put(lambda: self.update_status("Office Activated", "success"))
+                self.gui_queue.put(lambda: logger.info("Successfully pasted Confirmation ID to Office Activation Wizard."))
             else:
-                self.root.after(0, lambda: self.update_status("Paste Failed", "warning"))
-                self.root.after(0, lambda: self.prompt_manual_paste(groups))
+                self.gui_queue.put(lambda: self.update_status("Paste Failed", "warning"))
+                self.gui_queue.put(lambda: self.prompt_manual_paste(groups))
                 
         threading.Thread(target=paste_worker, daemon=True).start()
 
@@ -717,8 +769,8 @@ class AppGui:
         Launches the mock Office Activation Wizard in Training/Simulator Mode.
         """
         logger.info("Launching Technician Training Simulator window...")
-        sim_win = OfficeWizardSimulator(self.root)
-        sim_win.focus_set()
+        self.simulator_window = OfficeWizardSimulator(self.root)
+        self.simulator_window.focus_set()
 
     def on_closing(self):
         """
