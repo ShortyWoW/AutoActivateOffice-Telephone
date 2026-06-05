@@ -207,7 +207,17 @@ def perform_ocr(pil_img: Image.Image) -> list:
         ocr_result = pytesseract.image_to_string(processed_img, config=custom_config)
         logger.info(f"Raw OCR Output: {repr(ocr_result)}")
         
-        # Extract digits
+        # 1. Try finding a clean IID segment in the OCR output
+        iid_from_text = find_iid_in_text(ocr_result)
+        if iid_from_text:
+            return iid_from_text
+            
+        # 2. Check for exactly 9 blocks of 7 digits
+        seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
+        if len(seven_digit_blocks) == 9:
+            return seven_digit_blocks
+
+        # 3. Fallback: Extract all digits
         digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
         logger.info(f"Extracted {len(digits)} digits from OCR.")
         
@@ -247,6 +257,33 @@ def parse_iid_digits(digits_str: str) -> list:
                 groups.append("")
                 
     return groups
+
+def find_iid_in_text(text: str) -> list:
+    """
+    Searches for a 63-digit Installation ID in the OCR text.
+    It looks for any segment of text containing only digits and space/tab characters
+    (splitting on newlines and non-digit characters) and checks if it has exactly
+    63 digits (or close to 63 digits as a fallback).
+    """
+    # Replace non-digit, non-space, non-tab characters with pipe (which splits newlines too)
+    cleaned = re.sub(r"[^\d \t]", "|", text)
+    segments = cleaned.split("|")
+    
+    # First pass: look for exactly 63 digits
+    for seg in segments:
+        seg_digits = "".join(c for c in seg if c.isdigit())
+        if len(seg_digits) == 63:
+            logger.info("Found exactly 63 contiguous digits in OCR text segment.")
+            return parse_iid_digits(seg_digits)
+            
+    # Second pass: look for a segment with length close to 63 digits (58 to 68)
+    for seg in segments:
+        seg_digits = "".join(c for c in seg if c.isdigit())
+        if 58 <= len(seg_digits) <= 68:
+            logger.info(f"Found candidate segment with {len(seg_digits)} digits in OCR text. Using best-effort parsing.")
+            return parse_iid_digits(seg_digits)
+            
+    return None
 
 def auto_detect_and_ocr() -> list:
     """
@@ -298,17 +335,23 @@ def auto_detect_and_ocr() -> list:
         digits = "".join(DIGITS_ONLY_RE.findall(ocr_result))
         logger.info(f"Auto-extracted {len(digits)} digits from window OCR.")
         
-        # We check if we got exactly 63 digits
-        if len(digits) == IID_TOTAL_DIGITS:
-            logger.info("Successfully extracted 63-digit Installation ID from window OCR!")
-            return parse_iid_digits(digits)
+        # 1. Search for a sequence containing 63 digits (contiguous or separated by whitespace)
+        iid_from_text = find_iid_in_text(ocr_result)
+        if iid_from_text:
+            logger.info("Successfully extracted 63-digit Installation ID from window OCR text!")
+            return iid_from_text
             
-        # If not 63 digits, check if we can find exactly 9 blocks of 7 digits
+        # 2. Check if we can find exactly 9 blocks of 7 digits
         # This handles cases where other random digits (page numbers, etc) are OCR'd.
         seven_digit_blocks = re.findall(r"\b\d{7}\b", ocr_result)
         if len(seven_digit_blocks) == 9:
             logger.info(f"Found exactly 9 blocks of 7 digits in OCR: {seven_digit_blocks}")
             return seven_digit_blocks
+
+        # 3. Fallback: if all digits in the entire page equal 63, use it
+        if len(digits) == IID_TOTAL_DIGITS:
+            logger.info("Successfully extracted 63-digit Installation ID from window OCR!")
+            return parse_iid_digits(digits)
             
         logger.warning("Could not locate a clean 63-digit sequence in window OCR. Bailing to sniper fallback.")
         return None
