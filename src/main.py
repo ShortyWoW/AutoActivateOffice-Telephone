@@ -21,7 +21,24 @@ def check_environment():
         except Exception as e:
             print(f"Failed to create logs directory: {e}", file=sys.stderr)
 
+def enable_dpi_awareness():
+    """
+    Enables DPI awareness so that Win32 coordinates align perfectly
+    with PIL ImageGrab screenshots, even on scaled displays (125%, 150%, etc).
+    """
+    import ctypes
+    try:
+        # Try Per-Monitor DPI Aware (Windows 8.1+)
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            # Fallback to System DPI Aware (Windows Vista+)
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
 def main():
+    enable_dpi_awareness()
     logger.info("Initializing AutoActivateOffice Telephone Helper...")
     
     # Pre-flight environment check

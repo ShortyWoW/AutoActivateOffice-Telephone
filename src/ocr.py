@@ -148,7 +148,7 @@ class ScreenSniper:
         self.root.deiconify()
         self.callback(None)
 
-def preprocess_image(pil_img: Image.Image) -> "np.ndarray":
+def preprocess_image(pil_img: Image.Image, is_window: bool = False) -> "np.ndarray":
     """
     Applies OpenCV preprocessing to optimize image quality for OCR:
     1. Grayscale
@@ -178,10 +178,12 @@ def preprocess_image(pil_img: Image.Image) -> "np.ndarray":
     # In some cases, a dark background with light text might need inversion.
     # We will assume a light background by checking the mean value of the border pixels.
     # If the border is mostly black, we invert the image.
-    h, w = thresh.shape
-    border_pixels = np.concatenate([thresh[0, :], thresh[-1, :], thresh[:, 0], thresh[:, -1]])
-    if np.mean(border_pixels) < 127:
-        thresh = cv2.bitwise_not(thresh)
+    # Skip inversion for full windows as standard window frames trigger false positives.
+    if not is_window:
+        h, w = thresh.shape
+        border_pixels = np.concatenate([thresh[0, :], thresh[-1, :], thresh[:, 0], thresh[:, -1]])
+        if np.mean(border_pixels) < 127:
+            thresh = cv2.bitwise_not(thresh)
         
     return thresh
 
@@ -285,7 +287,7 @@ def auto_detect_and_ocr() -> list:
         
     try:
         # Preprocess the entire window screenshot
-        processed_img = preprocess_image(screenshot)
+        processed_img = preprocess_image(screenshot, is_window=True)
         
         # Perform OCR on the entire image
         custom_config = r'--psm 6 -c tessedit_char_whitelist=0123456789'
