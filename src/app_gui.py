@@ -267,14 +267,17 @@ class AppGui:
 
     def append_log(self, msg):
         """
-        Appends a message to the bottom log terminal text widget.
+        Appends a message to the bottom log terminal text widget safely from any thread.
         """
-        if not hasattr(self, 'log_text') or not self.log_text.winfo_exists():
-            return
-        self.log_text.config(state="normal")
-        self.log_text.insert(tk.END, msg)
-        self.log_text.see(tk.END)
-        self.log_text.config(state="disabled")
+        def safe_append():
+            if not hasattr(self, 'log_text') or not self.log_text.winfo_exists():
+                return
+            self.log_text.config(state="normal")
+            self.log_text.insert(tk.END, msg)
+            self.log_text.see(tk.END)
+            self.log_text.config(state="disabled")
+            
+        self.root.after(0, safe_append)
 
     # --- Keyboard entry handlers for IID fields ---
     
