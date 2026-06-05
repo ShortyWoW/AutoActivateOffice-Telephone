@@ -1,22 +1,23 @@
 import random
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+import webbrowser
 
 class OfficeWizardSimulator(tk.Toplevel):
     """
     A standalone tk.Toplevel window designed to mimic the Microsoft Office Activation Wizard.
-    Serves as a training tool for new technicians and a test harness for the developer.
+    Serves as an authentic training tool for technicians and a test harness for developers.
     """
     def __init__(self, parent):
         super().__init__(parent)
         
-        # Win32 target window title (used for window detection by office_window.py)
-        self.title("Microsoft Office Activation Wizard (Training Simulator)")
-        self.geometry("680x480")
-        self.configure(bg="#f3f3f3")
+        # Set exact window properties to match the real wizard
+        self.title("Microsoft Office Activation Wizard")
+        self.geometry("620x560")
+        self.configure(bg="#ffffff")
         self.resizable(False, False)
         
-        # Ensure it stays on top of the main app for easy visibility
+        # Ensure it stays visible during automation testing
         self.attributes("-topmost", True)
         
         # State variables
@@ -41,144 +42,227 @@ class OfficeWizardSimulator(tk.Toplevel):
         ]
 
     def create_widgets(self):
-        # 1. Header Banner
-        header_frame = tk.Frame(self, bg="#0078d4", height=70) # Classic Microsoft Blue
-        header_frame.pack(fill="x", side="top")
-        header_frame.pack_propagate(False)
+        # --- HEADER SECTION ---
+        # Product Title
+        product_lbl = tk.Label(
+            self, text="Microsoft Office Standard 2016",
+            fg="#202020", bg="#ffffff", font=("Segoe UI", 11, "bold")
+        )
+        product_lbl.place(x=20, y=20)
+
+        # Subtitle
+        subtitle_lbl = tk.Label(
+            self, text="Activation Wizard",
+            fg="#505050", bg="#ffffff", font=("Segoe UI", 9)
+        )
+        subtitle_lbl.place(x=20, y=42)
+
+        # Office Logo Canvas
+        self.logo_canvas = tk.Canvas(self, width=120, height=45, bg="#ffffff", highlightthickness=0)
+        self.logo_canvas.place(x=480, y=15)
         
-        header_lbl = tk.Label(
-            header_frame, 
-            text="Microsoft Office Activation Wizard (Training Mode)", 
-            fg="white", bg="#0078d4", 
-            font=("Segoe UI", 12, "bold"),
-            padx=15, pady=20
+        # Draw the orange Office symbol (a stylized open box / ribbon)
+        self.logo_canvas.create_polygon(
+            5, 12,   20, 2,   20, 32,   5, 26,
+            fill="#d83b01", outline=""
         )
-        header_lbl.pack(side="left")
-
-        # Main content area
-        content_frame = tk.Frame(self, bg="#f3f3f3", padx=20, pady=15)
-        content_frame.pack(fill="both", expand=True)
-
-        # 2. Training instructions
-        instruct_lbl = tk.Label(
-            content_frame,
-            text="Step 1: Use the Helper Tool to capture the Installation ID below (OCR or Auto-detect).\n"
-                 "Step 2: Auto-fill the portal to obtain your 48-digit Confirmation ID.\n"
-                 "Step 3: Click 'Paste to Office Wizard' in the Helper Tool to auto-type it here.",
-            fg="#404040", bg="#f3f3f3", justify="left", font=("Segoe UI", 9, "italic")
+        self.logo_canvas.create_polygon(
+            20, 2,   28, 7,   28, 26,   20, 32,
+            fill="#eb3c00", outline=""
         )
-        instruct_lbl.pack(anchor="w", pady=(0, 15))
-
-        # 3. Installation ID (IID) Frame
-        iid_frame = tk.LabelFrame(
-            content_frame, text=" Installation ID (IID) ",
-            fg="#0078d4", bg="white", font=("Segoe UI", 10, "bold"), bd=1, relief="solid",
-            padx=15, pady=15
+        self.logo_canvas.create_polygon(
+            5, 12,   12, 14,   12, 22,   5, 26,
+            fill="#ffffff", outline=""
         )
-        iid_frame.pack(fill="x", pady=10)
+        
+        # Add the text "Office" next to the icon
+        self.logo_canvas.create_text(
+            35, 17, text="Office", fill="#d83b01",
+            font=("Segoe UI", 16, "bold"), anchor="w"
+        )
 
-        # Installation ID display
-        self.iid_lbl_var = tk.StringVar()
+        # --- CONTENT SECTION ---
+        # Main instruction
+        main_instruct = tk.Label(
+            self, text="Follow these steps to activate your software over the telephone.",
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 9, "bold")
+        )
+        main_instruct.place(x=20, y=85)
+
+        # Step 1
+        step1_title = tk.Label(
+            self, text="Step 1:", fg="#000000", bg="#ffffff", font=("Segoe UI", 9, "bold")
+        )
+        step1_title.place(x=20, y=115)
+
+        step1_text = tk.Label(
+            self, 
+            text="Select the country/region you are calling from and call the Product Activation Center using\n"
+                 "any of the telephone numbers provided.",
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 9), justify="left", anchor="w"
+        )
+        step1_text.place(x=80, y=115)
+
+        # Styled Combobox
+        self.country_combo = ttk.Combobox(
+            self, values=["United States", "United Kingdom", "Canada", "Australia", "Germany"],
+            font=("Segoe UI", 9)
+        )
+        self.country_combo.set("select a country/region")
+        self.country_combo.place(x=80, y=155, width=320, height=22)
+
+        # Step 2
+        step2_title = tk.Label(
+            self, text="Step 2:", fg="#000000", bg="#ffffff", font=("Segoe UI", 9, "bold")
+        )
+        step2_title.place(x=20, y=205)
+
+        step2_text = tk.Label(
+            self, text="When prompted, provide this Installation ID:",
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 9), justify="left"
+        )
+        step2_text.place(x=80, y=205)
+
+        # Installation ID Bold text (exactly formatted for easy OCR)
+        self.iid_var = tk.StringVar()
         self.update_iid_display()
         
-        iid_display = tk.Label(
-            iid_frame, textvariable=self.iid_lbl_var,
-            fg="#202020", bg="white", font=("Consolas", 12, "bold"),
-            padx=5, pady=5, relief="flat"
+        self.iid_lbl = tk.Label(
+            self, textvariable=self.iid_var,
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 10, "bold")
         )
-        iid_display.pack(fill="x")
+        self.iid_lbl.place(x=80, y=230)
 
-        # 4. Confirmation ID (CID) Frame
-        cid_frame = tk.LabelFrame(
-            content_frame, text=" Confirmation ID (CID) ",
-            fg="#0078d4", bg="white", font=("Segoe UI", 10, "bold"), bd=1, relief="solid",
-            padx=15, pady=15
+        # Step 3
+        step3_title = tk.Label(
+            self, text="Step 3:", fg="#000000", bg="#ffffff", font=("Segoe UI", 9, "bold")
         )
-        cid_frame.pack(fill="x", pady=10)
+        step3_title.place(x=20, y=285)
 
-        cid_desc = tk.Label(
-            cid_frame, text="Enter the confirmation ID in the boxes below:",
-            fg="#404040", bg="white", font=("Segoe UI", 9)
+        step3_text = tk.Label(
+            self, text="Enter your Confirmation ID here:",
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 9), justify="left"
         )
-        cid_desc.pack(anchor="w", pady=(0, 5))
+        step3_text.place(x=80, y=285)
 
-        # Entry Grid (A to H)
-        entries_frame = tk.Frame(cid_frame, bg="white")
-        entries_frame.pack(fill="x", pady=5)
-
-        self.cid_entries = []
+        # Confirmation ID Input boxes (A-H)
         labels_ah = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        start_x = 80
+        box_width = 46
+        gap = 12
+        
+        self.cid_entries = []
         for i in range(8):
-            field_container = tk.Frame(entries_frame, bg="white")
-            field_container.pack(side="left", expand=True, padx=4)
+            x_pos = start_x + i * (box_width + gap)
+            
+            # Label A-H centered above the box
+            lbl = tk.Label(
+                self, text=labels_ah[i], fg="#505050", bg="#ffffff", 
+                font=("Segoe UI", 8, "bold"), width=5
+            )
+            lbl.place(x=x_pos, y=312)
             
             entry = tk.Entry(
-                field_container, width=6, bg="#ffffff", fg="#202020",
+                self, width=6, bg="#ffffff", fg="#000000",
                 justify="center", relief="solid", bd=1,
-                font=("Consolas", 11, "bold")
+                font=("Segoe UI", 10)
             )
-            entry.pack(side="top", fill="x")
+            entry.place(x=x_pos, y=332, width=box_width, height=24)
             
-            sub_lbl = tk.Label(
-                field_container, text=labels_ah[i], 
-                fg="#606060", bg="white", font=("Segoe UI", 8, "bold")
-            )
-            sub_lbl.pack(side="top", pady=2)
-            
-            # Bind keystrokes for auto-tabbing and validation
+            # Key bindings for tabbing
             entry.bind("<KeyPress>", lambda e, idx=i: self.on_cid_keypress(e, idx))
             entry.bind("<KeyRelease>", lambda e, idx=i: self.on_cid_keyrelease(e, idx))
             
             self.cid_entries.append(entry)
 
-        # 5. Controls Frame
-        controls_frame = tk.Frame(content_frame, bg="#f3f3f3")
-        controls_frame.pack(fill="x", pady=(15, 0))
+        # Temporary developer/technician utility buttons (for training setup)
+        util_frame = tk.Frame(self, bg="#ffffff")
+        util_frame.place(x=80, y=380)
 
         btn_random = tk.Button(
-            controls_frame, text="Randomize Installation ID", 
-            command=self.on_randomize_clicked, bg="#e1e1e1", fg="#202020",
-            relief="groove", padx=10, pady=4, font=("Segoe UI", 9)
+            util_frame, text="Randomize IID", command=self.on_randomize_clicked,
+            bg="#f3f3f3", fg="#333333", relief="solid", bd=1, padx=8, font=("Segoe UI", 8)
         )
         btn_random.pack(side="left")
 
-        btn_reset = tk.Button(
-            controls_frame, text="Reset Fields", 
-            command=self.on_reset_clicked, bg="#e1e1e1", fg="#202020",
-            relief="groove", padx=10, pady=4, font=("Segoe UI", 9)
+        btn_clear = tk.Button(
+            util_frame, text="Clear Fields", command=self.on_clear_clicked,
+            bg="#f3f3f3", fg="#333333", relief="solid", bd=1, padx=8, font=("Segoe UI", 8)
         )
-        btn_reset.pack(side="left", padx=10)
+        btn_clear.pack(side="left", padx=10)
 
-        # 6. Status Indicator
-        self.status_lbl = tk.Label(
-            controls_frame, text="Status: Waiting for Activation Key...",
-            fg="#606060", bg="#e1e1e1", font=("Segoe UI", 9, "bold"),
-            padx=12, pady=5, relief="flat"
+        # Privacy link
+        privacy_lbl = tk.Label(
+            self, text="Privacy Statement", fg="#0f7fd5", bg="#ffffff",
+            font=("Segoe UI", 9, "underline"), cursor="hand2"
         )
-        self.status_lbl.pack(side="right")
+        privacy_lbl.place(x=510, y=472)
+        privacy_lbl.bind("<Button-1>", lambda e: webbrowser.open("https://go.microsoft.com/fwlink/?LinkId=521839"))
+
+        # --- FOOTER BUTTONS BAR ---
+        # Line separator
+        sep = tk.Frame(self, height=1, bg="#d0d0d0")
+        sep.place(x=0, y=500, width=620)
+
+        footer_bar = tk.Frame(self, bg="#f0f0f0", height=60)
+        footer_bar.place(x=0, y=501, width=620)
+
+        # Helper to style Windows-like footer buttons
+        def create_footer_button(parent, text, command, x, is_default=False):
+            # Focus border color
+            border_color = "#0f7fd5" if is_default else "#a0a0a0"
+            btn = tk.Button(
+                parent, text=text, command=command, bg="#ffffff", fg="#000000",
+                relief="solid", bd=1, font=("Segoe UI", 9), highlightcolor=border_color,
+                activebackground="#f4f4f4"
+            )
+            btn.place(x=x, y=16, width=90, height=26)
+            return btn
+
+        create_footer_button(footer_bar, "Help", self.on_help, 20)
+        create_footer_button(footer_bar, "Back", lambda: None, 310)
+        self.btn_next = create_footer_button(footer_bar, "Next", self.on_next, 410, is_default=True)
+        create_footer_button(footer_bar, "Cancel", self.destroy, 510)
 
     def update_iid_display(self):
-        """Formats the generated Installation ID for clear layout display."""
-        # Split into blocks of 3 for the window screenshot rendering
-        text = "   ".join(self.iid_groups)
-        self.iid_lbl_var.set(text)
+        """Formats the generated Installation ID for realistic layout display."""
+        text = " ".join(self.iid_groups)
+        self.iid_var.set(text)
 
     def on_randomize_clicked(self):
         self.randomize_iid()
         self.update_iid_display()
-        self.on_reset_clicked()
+        self.on_clear_clicked()
 
-    def on_reset_clicked(self):
+    def on_clear_clicked(self):
         for entry in self.cid_entries:
             entry.delete(0, tk.END)
-        self.status_lbl.config(
-            text="Status: Waiting for Activation Key...", 
-            bg="#e1e1e1", fg="#606060"
-        )
         if self.cid_entries:
             self.cid_entries[0].focus_set()
 
-    # --- Auto-tabbing and simulation detection ---
+    def on_help(self):
+        messagebox.showinfo(
+            "Activation Help",
+            "This is a simulator window representing the Microsoft Office Activation Wizard.\n\n"
+            "Use it to train technicians on configuring telephone activations or verifying OCR capture."
+        )
+
+    def on_next(self):
+        full_cid = "".join(e.get().strip() for e in self.cid_entries)
+        if len(full_cid) == 48:
+            messagebox.showinfo(
+                "Microsoft Office Activation",
+                "Products activated successfully.\n\n"
+                "Thank you for using Microsoft Office."
+            )
+            self.destroy()
+        else:
+            messagebox.showwarning(
+                "Microsoft Office Activation",
+                "The Confirmation ID entered is incomplete. It must consist of 8 groups of 6 digits (48 digits total)."
+            )
+
+    # --- Auto-tabbing and tabbing handling ---
 
     def on_cid_keypress(self, event, index):
         if event.keysym == "BackSpace":
@@ -194,11 +278,10 @@ class OfficeWizardSimulator(tk.Toplevel):
     def on_cid_keyrelease(self, event, index):
         # Ignore control/navigation keys
         if event.keysym in ["Tab", "Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "BackSpace"]:
-            self.check_activation_status()
             return
             
         val = self.cid_entries[index].get()
-        # Ensure only numeric digits
+        # Keep only digits
         digits = "".join(c for c in val if c.isdigit())
         
         if digits != val:
@@ -212,19 +295,3 @@ class OfficeWizardSimulator(tk.Toplevel):
             if index < 7:
                 self.cid_entries[index+1].focus_set()
                 self.cid_entries[index+1].icursor(0)
-                
-        self.check_activation_status()
-
-    def check_activation_status(self):
-        """Scans CID entry fields and lights up green if all 48 digits are populated."""
-        full_cid = "".join(e.get().strip() for e in self.cid_entries)
-        if len(full_cid) == 48:
-            self.status_lbl.config(
-                text="Status: Activated (Simulation Mode)!", 
-                bg="#2ea043", fg="white" # Success Green
-            )
-        else:
-            self.status_lbl.config(
-                text="Status: Typing/Pasting...", 
-                bg="#d29922", fg="white" # Warning Amber
-            )
