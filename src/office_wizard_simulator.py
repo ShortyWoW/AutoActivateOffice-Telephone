@@ -21,11 +21,8 @@ class OfficeWizardSimulator(tk.Toplevel):
         self.attributes("-topmost", True)
         
         # State variables
-        self.iid_groups = []
+        self.iid_groups = ["3000191", "5708926", "9053711", "4144981", "9482725", "1786231", "2355084", "2980272", "5547046"]
         self.cid_entries = []
-        
-        # Generate initial Installation ID
-        self.randomize_iid()
         
         # Build UI layout
         self.create_widgets()

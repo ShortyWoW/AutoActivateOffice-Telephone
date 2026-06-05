@@ -7,31 +7,28 @@ from src.logging_setup import logger, get_window_title
 def find_office_wizard_windows():
     """
     Finds open window handles and titles that match Microsoft Office Activation Wizard.
+    Uses FindWindow to avoid background thread EnumWindows callbacks.
     """
     matches = []
-    
-    def win_enum_callback(hwnd, extra):
-        if win32gui.IsWindowVisible(hwnd):
-            title = get_window_title(hwnd)
-            title_lower = title.lower()
-            # Common titles: "Microsoft Office Activation Wizard", "Activation Wizard"
-            if "activation wizard" in title_lower or "microsoft office" in title_lower:
-                # Exclude our own tool title
-                if "telephone helper" not in title_lower:
-                    matches.append((hwnd, title))
-        return True
-
-    try:
-        win32gui.EnumWindows(win_enum_callback, None)
-    except Exception as e:
-        logger.error(f"Error enumerating windows: {e}")
-    
+    for title in [
+        "Microsoft Office Activation Wizard", 
+        "Activation Wizard", 
+        "Office Activation Wizard", 
+        "Microsoft Office Activation"
+    ]:
+        hwnd = win32gui.FindWindow(None, title)
+        if hwnd and win32gui.IsWindowVisible(hwnd):
+            matches.append((hwnd, title))
+            return matches
+            
     return matches
 
 def bring_window_to_front(hwnd):
     """
     Brings the window with specified handle to the front, restoring it if minimized.
     """
+    import win32process
+    import os
     try:
         # Check if minimized
         if win32gui.IsIconic(hwnd):
@@ -39,7 +36,11 @@ def bring_window_to_front(hwnd):
         else:
             win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
             
-        win32gui.SetForegroundWindow(hwnd)
+        # Avoid SetForegroundWindow deadlock if window belongs to our own process
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        if pid != os.getpid():
+            win32gui.SetForegroundWindow(hwnd)
+            
         logger.info(f"Brought window (HWND: {hwnd}) to front.")
         return True
     except Exception as e:
