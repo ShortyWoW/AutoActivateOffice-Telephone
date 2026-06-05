@@ -86,19 +86,37 @@ def register_gui_callback(callback):
     logger.addHandler(gui_handler)
     logger.info("GUI Logging connection established.")
 
-def get_window_title(hwnd) -> str:
+def get_window_title(hwnd, timeout_ms=200) -> str:
     """
-    Safely retrieves the window title, avoiding hangs on unresponsive windows.
+    Safely retrieves the window title, avoiding hangs on unresponsive windows
+    by using SendMessageTimeoutW instead of standard GetWindowText.
     """
     try:
         import ctypes
-        import win32gui
-        # IsHungAppWindow returns non-zero if the window is hung/unresponsive
+        # Check if hung first to fail fast
         if ctypes.windll.user32.IsHungAppWindow(hwnd):
             return ""
-        return win32gui.GetWindowText(hwnd).strip()
+            
+        WM_GETTEXT = 0x000D
+        SMTO_ABORTIFHUNG = 0x0002
+        
+        buf = ctypes.create_unicode_buffer(512)
+        result_len = ctypes.c_ulong()
+        
+        res = ctypes.windll.user32.SendMessageTimeoutW(
+            hwnd,
+            WM_GETTEXT,
+            512,
+            buf,
+            SMTO_ABORTIFHUNG,
+            timeout_ms,
+            ctypes.byref(result_len)
+        )
+        if res != 0:
+            return buf.value.strip()
     except Exception:
-        return ""
+        pass
+    return ""
 
 def log_system_diagnostics():
     """
