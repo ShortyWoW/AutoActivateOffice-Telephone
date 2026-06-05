@@ -19,3 +19,7 @@ Tesseract-OCR/
 .vscode/
 .project
 .pydevproject
+
+# Temp files
+temp/
+

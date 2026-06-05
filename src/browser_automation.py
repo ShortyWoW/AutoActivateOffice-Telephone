@@ -138,12 +138,36 @@ class BrowserController:
             self._click_next_button()
             return True
 
-        # Method 2: If we didn't find all 9 by ID pattern, fall back to finding all text-like inputs
+        # Method 2: Try looking for a single large input box (prioritized over general DOM search)
+        single_input = self.find_element_by_selectors([
+            (By.ID, "installation_id"),
+            (By.ID, "iid"),
+            (By.CSS_SELECTOR, "input[name='installation_id']"),
+            (By.CSS_SELECTOR, "input[placeholder*='Installation ID']"),
+            (By.CSS_SELECTOR, "input[placeholder*='installation ID']"),
+            (By.CSS_SELECTOR, "input[placeholder*='IID']")
+        ])
+        if single_input:
+            full_iid = "".join(iid_groups)
+            single_input.clear()
+            single_input.send_keys(full_iid)
+            logger.info("Successfully filled Installation ID into single input field.")
+            self._click_next_button()
+            return True
+
+        # Method 3: If we didn't find all 9 by ID pattern or a single input, fall back to finding all text-like inputs
         all_inputs = self.driver.find_elements(By.TAG_NAME, "input")
         filtered_inputs = []
         for inp in all_inputs:
             try:
-                if inp.is_displayed() and inp.get_attribute("type") in ["text", "tel", "number"]:
+                is_readonly = (inp.get_attribute("readonly") or "").lower()
+                is_disabled = (inp.get_attribute("disabled") or "").lower()
+                if (inp.is_displayed() and 
+                    inp.is_enabled() and 
+                    is_readonly not in ["true", "readonly"] and
+                    is_disabled not in ["true", "disabled"] and
+                    inp.get_attribute("type") in ["text", "tel", "number"]):
+                    
                     name = (inp.get_attribute("name") or "").lower()
                     placeholder = (inp.get_attribute("placeholder") or "").lower()
                     # Filter out search or button inputs
@@ -160,23 +184,6 @@ class BrowserController:
                 inp.clear()
                 inp.send_keys(val)
             logger.info("Discovered and filled 9 input fields via general DOM search.")
-            self._click_next_button()
-            return True
-            
-        # Method 3: Try looking for a single large input box
-        single_input = self.find_element_by_selectors([
-            (By.ID, "installation_id"),
-            (By.ID, "iid"),
-            (By.CSS_SELECTOR, "input[name='installation_id']"),
-            (By.CSS_SELECTOR, "input[placeholder*='Installation ID']"),
-            (By.CSS_SELECTOR, "input[placeholder*='installation ID']"),
-            (By.CSS_SELECTOR, "input[placeholder*='IID']")
-        ])
-        if single_input:
-            full_iid = "".join(iid_groups)
-            single_input.clear()
-            single_input.send_keys(full_iid)
-            logger.info("Successfully filled Installation ID into single input field.")
             self._click_next_button()
             return True
 
@@ -325,6 +332,11 @@ class BrowserController:
                 (By.ID, "nextBtn"),
                 (By.CSS_SELECTOR, "button[type='submit']"),
                 (By.CSS_SELECTOR, "input[type='submit']"),
+                (By.XPATH, "//button[contains(., 'Submit')]"),
+                (By.XPATH, "//button[contains(., 'Next')]"),
+                (By.XPATH, "//button[contains(., 'submit')]"),
+                (By.XPATH, "//button[contains(., 'next')]"),
+                (By.CSS_SELECTOR, "button.ms-Button--primary"),
                 (By.XPATH, "//button[contains(text(), 'Next')]"),
                 (By.XPATH, "//button[contains(text(), 'Submit')]"),
                 (By.XPATH, "//button[contains(text(), 'next')]"),
