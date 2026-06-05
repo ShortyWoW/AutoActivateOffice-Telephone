@@ -539,16 +539,19 @@ class AppGui:
             for i in range(8):
                 self.cid_entries[i].delete(0, tk.END)
                 self.cid_entries[i].insert(0, cid_groups[i])
-            self.update_status("CID Captured", "success")
+            self.update_status("CID Scraped", "success")
             logger.info(f"Automatically scraped Confirmation ID: {''.join(cid_groups)}")
             
-            # Focus helper app window
+            # Focus helper app window and sound bell
             self.root.deiconify()
             self.root.focus_force()
             self.root.lift()
+            try:
+                self.root.bell()
+            except Exception:
+                pass
             
-            # Prompt user to paste into Office Wizard
-            self.on_paste_office_clicked()
+            logger.info("Confirmation ID loaded into GUI. Click 'Paste to Office Wizard' to finish activation.")
             
         self.root.after(0, gui_update)
 
