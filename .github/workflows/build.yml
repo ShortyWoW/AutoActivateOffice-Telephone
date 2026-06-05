@@ -42,24 +42,24 @@ jobs:
 
     - name: Build Executable with PyInstaller
       run: |
-        pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --add-data "tesseract;tesseract" --distpath ./dist --workpath ./build src/main.py
+        pyinstaller --onefile --noconsole --noconfirm --name OfficePhoneActivator --clean --paths . --icon "assets/app_icon.ico" --add-data "tesseract;tesseract" --add-data "assets;assets" --distpath ./dist --workpath ./build src/main.py
       shell: pwsh
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         tag_name: v1.0.${{ github.run_number }}
-        name: AutoActivateOffice Telephone Helper v1.0.${{ github.run_number }}
+        name: Office Phone Activator v1.0.${{ github.run_number }}
         draft: false
         prerelease: false
-        files: dist/AutoActivateOffice-Telephone.exe
+        files: dist/OfficePhoneActivator.exe
         body: |
-          Auto-generated release for the AutoActivateOffice Telephone Helper.
+          Auto-generated release for the Office Phone Activator.
           
-          This release contains the portable Windows helper application as a single, standalone executable pre-bundled with Tesseract OCR.
+          This release contains the portable Windows helper application as a single, standalone executable pre-bundled with Tesseract OCR and custom app icon.
           
           ### Running the Application
-          1. Download the `AutoActivateOffice-Telephone.exe` file below.
+          1. Download the `OfficePhoneActivator.exe` file below.
           2. Double-click to run the tool. No installation or extraction is required!
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

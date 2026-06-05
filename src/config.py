@@ -1,11 +1,11 @@
 import os
 import re
 
-# App Settings
-APP_TITLE = "AutoActivateOffice Telephone Helper"
-WINDOW_GEOMETRY = "720x360"
-
 import sys
+
+# App Settings
+APP_TITLE = "Office Phone Activator"
+WINDOW_GEOMETRY = "720x360"
 
 # Files and Folders
 if getattr(sys, 'frozen', False):
@@ -14,6 +14,12 @@ if getattr(sys, 'frozen', False):
 else:
     # Development source directory
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Icon Path
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    ICON_PATH = os.path.join(sys._MEIPASS, "assets", "app_icon.ico")
+else:
+    ICON_PATH = os.path.join(BASE_DIR, "assets", "app_icon.ico")
 
 LOGS_DIR = os.path.join(BASE_DIR, "Logs")
 

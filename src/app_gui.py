@@ -5,7 +5,8 @@ import threading
 import queue
 from src.config import (
     APP_TITLE, WINDOW_GEOMETRY, COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_ACCENT_HOVER,
-    COLOR_TEXT, COLOR_MUTED, COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR, COLOR_BORDER
+    COLOR_TEXT, COLOR_MUTED, COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR, COLOR_BORDER,
+    ICON_PATH
 )
 from src.logging_setup import register_gui_callback, logger
 from src.clipboard_tools import copy_iid_groups, copy_cid_groups, parse_clipboard_digits
@@ -18,6 +19,16 @@ class AppGui:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(APP_TITLE)
+        
+        # Set window icon
+        try:
+            import os
+            if os.path.exists(ICON_PATH):
+                self.root.iconbitmap(ICON_PATH)
+            else:
+                logger.debug(f"Window icon file not found at: {ICON_PATH}")
+        except Exception as e:
+            logger.debug(f"Failed to set window icon: {e}")
         
         # Calculate DPI scale factor dynamically
         try:
