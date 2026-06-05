@@ -11,6 +11,7 @@ from src.clipboard_tools import copy_iid_groups, copy_cid_groups, parse_clipboar
 from src.ocr import ScreenSniper, perform_ocr
 from src.browser_automation import BrowserController
 from src.office_window import auto_paste_confirmation_id, paste_cid_to_focused_window
+from src.office_wizard_simulator import OfficeWizardSimulator
 
 class AppGui:
     def __init__(self, root: tk.Tk):
@@ -205,8 +206,16 @@ class AppGui:
         log_card = tk.Frame(main_container, bg=COLOR_BG)
         log_card.pack(fill="both", expand=True, pady=5)
         
-        log_lbl = tk.Label(log_card, text="Log Console", fg=COLOR_TEXT, bg=COLOR_BG, font=("Segoe UI", 10, "bold"))
-        log_lbl.pack(anchor="w", pady=(0, 2))
+        log_header_frame = tk.Frame(log_card, bg=COLOR_BG)
+        log_header_frame.pack(fill="x", pady=(0, 2))
+        
+        log_lbl = tk.Label(log_header_frame, text="Log Console", fg=COLOR_TEXT, bg=COLOR_BG, font=("Segoe UI", 10, "bold"))
+        log_lbl.pack(side="left")
+        
+        self.btn_launch_sim = self.create_styled_button(
+            log_header_frame, "Launch Training Simulator", self.on_launch_simulator_clicked, COLOR_CARD, has_border=True
+        )
+        self.btn_launch_sim.pack(side="right")
         
         self.log_text = scrolledtext.ScrolledText(
             log_card, height=6, bg=COLOR_CARD, fg=COLOR_TEXT, relief="solid", bd=1,
@@ -714,6 +723,14 @@ class AppGui:
                 self.update_status("Pasted (Focused)", "success")
                 
         self.root.after(1000, lambda: tick(4))
+
+    def on_launch_simulator_clicked(self):
+        """
+        Launches the mock Office Activation Wizard in Training/Simulator Mode.
+        """
+        logger.info("Launching Technician Training Simulator window...")
+        sim_win = OfficeWizardSimulator(self.root)
+        sim_win.focus_set()
 
     def on_closing(self):
         """
