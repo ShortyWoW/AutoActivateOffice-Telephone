@@ -86,6 +86,20 @@ def register_gui_callback(callback):
     logger.addHandler(gui_handler)
     logger.info("GUI Logging connection established.")
 
+def get_window_title(hwnd) -> str:
+    """
+    Safely retrieves the window title, avoiding hangs on unresponsive windows.
+    """
+    try:
+        import ctypes
+        import win32gui
+        # IsHungAppWindow returns non-zero if the window is hung/unresponsive
+        if ctypes.windll.user32.IsHungAppWindow(hwnd):
+            return ""
+        return win32gui.GetWindowText(hwnd).strip()
+    except Exception:
+        return ""
+
 def log_system_diagnostics():
     """
     Queries and logs system information, display resolution, browser versions,
@@ -151,7 +165,7 @@ def log_system_diagnostics():
         
         def enum_win_titles(hwnd, extra):
             if win32gui.IsWindowVisible(hwnd):
-                title = win32gui.GetWindowText(hwnd).strip()
+                title = get_window_title(hwnd)
                 if title:
                     visible_windows.append(title)
             return True

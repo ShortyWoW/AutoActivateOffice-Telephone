@@ -2,7 +2,7 @@ import time
 import win32gui
 import win32con
 from PIL import ImageGrab
-from src.logging_setup import logger
+from src.logging_setup import logger, get_window_title
 
 def find_office_wizard_windows():
     """
@@ -12,7 +12,7 @@ def find_office_wizard_windows():
     
     def win_enum_callback(hwnd, extra):
         if win32gui.IsWindowVisible(hwnd):
-            title = win32gui.GetWindowText(hwnd)
+            title = get_window_title(hwnd)
             title_lower = title.lower()
             # Common titles: "Microsoft Office Activation Wizard", "Activation Wizard"
             if "activation wizard" in title_lower or "microsoft office" in title_lower:
