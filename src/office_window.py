@@ -82,7 +82,7 @@ def capture_window_screenshot(hwnd):
         logger.error(f"Failed to capture window screenshot: {e}")
         return None
 
-def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0.02):
+def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0.01):
     """
     Simulates typing the 8 groups of 6 digits into the active window.
     Assumes the user has focused the first input field (Group A).
@@ -97,11 +97,14 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
     
     logger.info("Starting simulation of CID keystrokes...")
     
-    # We will simulate typing each digit. 
-    # Because Office input fields auto-advance, typing sequentially works perfectly.
-    for char in full_cid:
-        pyautogui.write(char)
-        time.sleep(delay_between_chars)
+    # Temporarily reduce PyAutoGUI's default pause to speed up character entry
+    old_pause = pyautogui.PAUSE
+    pyautogui.PAUSE = 0.005
+    try:
+        # Write the entire string at once with a small delay between characters
+        pyautogui.write(full_cid, interval=delay_between_chars)
+    finally:
+        pyautogui.PAUSE = old_pause
         
     logger.info("Finished typing Confirmation ID.")
     return True
