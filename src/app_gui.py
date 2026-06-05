@@ -682,15 +682,21 @@ class AppGui:
             logger.info(f"Automatically scraped Confirmation ID: {''.join(cid_groups)}")
             
             # Minimize browser window to restore focus to our application
+            minimized = False
             try:
                 if self.browser_controller.is_alive():
                     self.browser_controller.driver.minimize_window()
-                    logger.info("Minimized browser window to restore focus to helper application.")
+                    logger.info("Minimized browser window. Waiting for window focus to settle...")
+                    minimized = True
             except Exception as e:
                 logger.debug(f"Failed to minimize browser window: {e}")
                 
-            # Immediately trigger the auto-paste to the Office Wizard
-            self.on_paste_office_clicked()
+            # If browser was minimized, wait 800ms to allow Windows window transition/focus to settle
+            # otherwise focus-competition between browser minimization and wizard restoration causes lost typing focus.
+            if minimized:
+                self.root.after(800, self.on_paste_office_clicked)
+            else:
+                self.on_paste_office_clicked()
             
         self.gui_queue.put(gui_update)
 
