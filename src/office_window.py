@@ -181,8 +181,11 @@ def auto_paste_confirmation_id(cid_groups: list) -> bool:
         try:
             import pyautogui
             import win32gui
-            rect = win32gui.GetWindowRect(hwnd)
-            x1, y1, x2, y2 = rect
+            # Use true visual bounds (excluding DWM shadows) for exact coordinate calculation
+            bounds = get_extended_frame_bounds(hwnd)
+            if not bounds:
+                bounds = win32gui.GetWindowRect(hwnd)
+            x1, y1, x2, y2 = bounds
             width = x2 - x1
             height = y2 - y1
             if width > 0 and height > 0:
