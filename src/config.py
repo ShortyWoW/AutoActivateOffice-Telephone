@@ -15,8 +15,7 @@ else:
     # Development source directory
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
-LOG_FILE_PATH = os.path.join(LOGS_DIR, "app.log")
+LOGS_DIR = os.path.join(BASE_DIR, "Logs")
 
 # Activation settings
 ACTIVATION_URL = "https://aka.ms/aoh"

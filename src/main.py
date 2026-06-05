@@ -14,12 +14,12 @@ def check_environment():
     Validates the local environment and directories before launching the GUI.
     """
     # Create logs directory if missing
-    logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Logs")
     if not os.path.exists(logs_dir):
         try:
             os.makedirs(logs_dir)
         except Exception as e:
-            print(f"Failed to create logs directory: {e}", file=sys.stderr)
+            print(f"Failed to create Logs directory: {e}", file=sys.stderr)
 
 def enable_dpi_awareness():
     """
@@ -62,7 +62,7 @@ def main():
         messagebox.showerror(
             "Application Crash",
             f"An unexpected critical error occurred:\n\n{e}\n\n"
-            "Please check logs/app.log for details."
+            "Please check the Logs directory for details."
         )
         sys.exit(1)
 

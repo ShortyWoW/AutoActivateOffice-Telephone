@@ -1,7 +1,9 @@
 import logging
 import os
 import sys
-from src.config import LOGS_DIR, LOG_FILE_PATH
+import socket
+from datetime import datetime
+from src.config import LOGS_DIR
 
 class GuiLogHandler(logging.Handler):
     """
@@ -23,14 +25,25 @@ class GuiLogHandler(logging.Handler):
 def setup_logger():
     """
     Initializes system logging. Logs are written to both standard console
-    and to logs/app.log in the project directory.
+    and dynamically to Logs/<SYSTEM_NAME>/<DATESTAMP>.log in the project directory.
     """
+    # Get hostname and date stamp dynamically at runtime
+    try:
+        system_name = socket.gethostname()
+    except Exception:
+        system_name = os.environ.get("COMPUTERNAME", "UNKNOWN_SYSTEM")
+        
+    date_stamp = datetime.now().strftime("%Y-%m-%d")
+    
+    # Target directory: BASE_DIR/Logs/SYSTEM_NAME/
+    system_log_dir = os.path.join(LOGS_DIR, system_name)
+    
     # Create logs directory if it doesn't exist
-    if not os.path.exists(LOGS_DIR):
+    if not os.path.exists(system_log_dir):
         try:
-            os.makedirs(LOGS_DIR)
+            os.makedirs(system_log_dir)
         except Exception as e:
-            print(f"Error creating logs directory: {e}", file=sys.stderr)
+            print(f"Error creating logs directory {system_log_dir}: {e}", file=sys.stderr)
 
     logger = logging.getLogger("AutoActivateOffice")
     logger.setLevel(logging.INFO)
@@ -44,7 +57,8 @@ def setup_logger():
 
     # File Handler
     try:
-        file_handler = logging.FileHandler(LOG_FILE_PATH, encoding='utf-8')
+        log_file_path = os.path.join(system_log_dir, f"{date_stamp}.log")
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     except Exception as e:
