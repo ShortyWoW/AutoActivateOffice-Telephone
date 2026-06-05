@@ -91,162 +91,156 @@ class AppGui:
         )
         self.status_bar.pack(side="right")
         
-        # Main container with scrolling or grid
+        # Main container
         main_container = tk.Frame(self.root, bg=COLOR_BG)
         main_container.pack(fill="both", expand=True, padx=15, pady=5)
         
-        # 2. Card 1: Installation ID Section
-        iid_card = tk.LabelFrame(
-            main_container, text=" 1. Installation ID (IID) ",
-            fg=COLOR_TEXT, bg=COLOR_CARD, bd=1, relief="solid", font=("Segoe UI", 11, "bold"),
-            padx=10, pady=10
-        )
-        iid_card.pack(fill="x", pady=5)
+        # 2. Primary Action Panel (One giant Start button)
+        primary_frame = tk.Frame(main_container, bg=COLOR_CARD, bd=1, relief="solid", pady=15)
+        primary_frame.pack(fill="x", pady=5)
         
-        iid_desc = tk.Label(
-            iid_card, text="Retrieve 9 groups of 7 digits from the Office Activation Wizard:",
+        self.btn_auto_activate = tk.Button(
+            primary_frame, text="Start Auto-Activation", command=self.on_start_auto_activation,
+            bg=COLOR_ACCENT, fg=COLOR_TEXT, activebackground=COLOR_ACCENT_HOVER, activeforeground="white",
+            relief="flat", bd=0, padx=30, pady=12, font=("Segoe UI", 12, "bold")
+        )
+        self.btn_auto_activate.pack(anchor="center")
+        
+        # Add hover effects to the primary button
+        def on_btn_enter(e):
+            self.btn_auto_activate.config(bg=COLOR_ACCENT_HOVER)
+        def on_btn_leave(e):
+            self.btn_auto_activate.config(bg=COLOR_ACCENT)
+        self.btn_auto_activate.bind("<Enter>", on_btn_enter)
+        self.btn_auto_activate.bind("<Leave>", on_btn_leave)
+        
+        primary_desc = tk.Label(
+            primary_frame, text="One-click activation: Automatically captures IID, fills browser portal, and pastes Confirmation ID.",
             fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 9)
         )
-        iid_desc.pack(anchor="w", pady=(0, 10))
+        primary_desc.pack(anchor="center", pady=(8, 0))
+
+        # 3. Verification Fields Panel (Compact representation of captured numbers)
+        fields_card = tk.LabelFrame(
+            main_container, text=" Verification Fields (Auto-Populated) ",
+            fg=COLOR_TEXT, bg=COLOR_CARD, bd=1, relief="solid", font=("Segoe UI", 10, "bold"),
+            padx=10, pady=8
+        )
+        fields_card.pack(fill="x", pady=5)
         
-        # IID Fields Frame
-        iid_fields_frame = tk.Frame(iid_card, bg=COLOR_CARD)
-        iid_fields_frame.pack(fill="x", pady=5)
+        # Row 1: IID
+        iid_row = tk.Frame(fields_card, bg=COLOR_CARD)
+        iid_row.pack(fill="x", pady=4)
+        
+        iid_lbl = tk.Label(iid_row, text="Installation ID:", fg=COLOR_TEXT, bg=COLOR_CARD, font=("Segoe UI", 9, "bold"), width=15, anchor="w")
+        iid_lbl.pack(side="left")
+        
+        iid_fields_frame = tk.Frame(iid_row, bg=COLOR_CARD)
+        iid_fields_frame.pack(side="left", fill="x", expand=True)
         
         self.iid_entries = []
         for i in range(9):
-            # Container for entry + sub label
-            field_container = tk.Frame(iid_fields_frame, bg=COLOR_CARD)
-            field_container.pack(side="left", expand=True, padx=2)
-            
             entry = tk.Entry(
-                field_container, width=7, bg=COLOR_BG, fg=COLOR_TEXT,
+                iid_fields_frame, width=7, bg=COLOR_BG, fg=COLOR_TEXT,
                 insertbackground=COLOR_TEXT, justify="center", relief="flat",
-                font=("Segoe UI", 11, "bold"), highlightbackground=COLOR_BORDER,
+                font=("Segoe UI", 10, "bold"), highlightbackground=COLOR_BORDER,
                 highlightthickness=1, highlightcolor=COLOR_ACCENT
             )
-            entry.pack(side="top", fill="x")
+            entry.pack(side="left", padx=2, expand=True, fill="x")
             
-            # Sub-label showing group index 1 to 9
-            sub_lbl = tk.Label(field_container, text=str(i+1), fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 8))
-            sub_lbl.pack(side="top", pady=2)
-            
-            # Setup keyboard navigation and paste handlers
             entry.bind("<KeyPress>", lambda e, idx=i: self.on_iid_keypress(e, idx))
             entry.bind("<KeyRelease>", lambda e, idx=i: self.on_iid_keyrelease(e, idx))
             entry.bind("<Control-v>", lambda e, idx=i: self.on_iid_paste(e, idx))
             entry.bind("<<Paste>>", lambda e, idx=i: self.on_iid_paste(e, idx))
-            
             self.iid_entries.append(entry)
             
-        # IID Actions Frame
-        iid_actions_frame = tk.Frame(iid_card, bg=COLOR_CARD, pady=5)
-        iid_actions_frame.pack(fill="x", pady=(5, 0))
+        # Row 2: CID
+        cid_row = tk.Frame(fields_card, bg=COLOR_CARD)
+        cid_row.pack(fill="x", pady=4)
         
-        self.btn_capture_iid = self.create_styled_button(
-            iid_actions_frame, "Capture Installation ID", self.on_capture_iid_clicked, COLOR_ACCENT
-        )
-        self.btn_capture_iid.pack(side="left", padx=5)
+        cid_lbl = tk.Label(cid_row, text="Confirmation ID:", fg=COLOR_TEXT, bg=COLOR_CARD, font=("Segoe UI", 9, "bold"), width=15, anchor="w")
+        cid_lbl.pack(side="left")
         
-        self.btn_copy_iid = self.create_styled_button(
-            iid_actions_frame, "Copy Installation ID", self.on_copy_iid_clicked, COLOR_CARD, has_border=True
-        )
-        self.btn_copy_iid.pack(side="left", padx=5)
-        
-        # 3. Card 2: Browser Automation Section
-        browser_card = tk.LabelFrame(
-            main_container, text=" 2. Browser Activation Portal ",
-            fg=COLOR_TEXT, bg=COLOR_CARD, bd=1, relief="solid", font=("Segoe UI", 11, "bold"),
-            padx=10, pady=10
-        )
-        browser_card.pack(fill="x", pady=5)
-        
-        browser_desc = tk.Label(
-            browser_card, text="Open Microsoft activation site, sign in manually, then fill the values:",
-            fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 9)
-        )
-        browser_desc.pack(anchor="w", pady=(0, 10))
-        
-        browser_actions_frame = tk.Frame(browser_card, bg=COLOR_CARD)
-        browser_actions_frame.pack(fill="x")
-        
-        self.btn_open_web = self.create_styled_button(
-            browser_actions_frame, "Open Activation Website", self.on_open_web_clicked, COLOR_ACCENT
-        )
-        self.btn_open_web.pack(side="left", padx=5)
-        
-        self.btn_fill_web = self.create_styled_button(
-            browser_actions_frame, "Fill Website", self.on_fill_web_clicked, COLOR_CARD, has_border=True
-        )
-        self.btn_fill_web.pack(side="left", padx=5)
-        
-        # 4. Card 3: Confirmation ID Section
-        cid_card = tk.LabelFrame(
-            main_container, text=" 3. Confirmation ID (CID) ",
-            fg=COLOR_TEXT, bg=COLOR_CARD, bd=1, relief="solid", font=("Segoe UI", 11, "bold"),
-            padx=10, pady=10
-        )
-        cid_card.pack(fill="x", pady=5)
-        
-        cid_desc = tk.Label(
-            cid_card, text="Retrieve 8 groups of 6 digits (A through H) to complete activation:",
-            fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 9)
-        )
-        cid_desc.pack(anchor="w", pady=(0, 10))
-        
-        # CID Fields Frame
-        cid_fields_frame = tk.Frame(cid_card, bg=COLOR_CARD)
-        cid_fields_frame.pack(fill="x", pady=5)
+        cid_fields_frame = tk.Frame(cid_row, bg=COLOR_CARD)
+        cid_fields_frame.pack(side="left", fill="x", expand=True)
         
         self.cid_entries = []
-        labels_ah = ["A", "B", "C", "D", "E", "F", "G", "H"]
         for i in range(8):
-            field_container = tk.Frame(cid_fields_frame, bg=COLOR_CARD)
-            field_container.pack(side="left", expand=True, padx=2)
-            
             entry = tk.Entry(
-                field_container, width=7, bg=COLOR_BG, fg=COLOR_TEXT,
+                cid_fields_frame, width=7, bg=COLOR_BG, fg=COLOR_TEXT,
                 insertbackground=COLOR_TEXT, justify="center", relief="flat",
-                font=("Segoe UI", 11, "bold"), highlightbackground=COLOR_BORDER,
+                font=("Segoe UI", 10, "bold"), highlightbackground=COLOR_BORDER,
                 highlightthickness=1, highlightcolor=COLOR_ACCENT
             )
-            entry.pack(side="top", fill="x")
+            entry.pack(side="left", padx=2, expand=True, fill="x")
             
-            sub_lbl = tk.Label(field_container, text=labels_ah[i], fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 8, "bold"))
-            sub_lbl.pack(side="top", pady=2)
-            
-            # Setup keyboard navigation and paste handlers
             entry.bind("<KeyPress>", lambda e, idx=i: self.on_cid_keypress(e, idx))
             entry.bind("<KeyRelease>", lambda e, idx=i: self.on_cid_keyrelease(e, idx))
             entry.bind("<Control-v>", lambda e, idx=i: self.on_cid_paste(e, idx))
             entry.bind("<<Paste>>", lambda e, idx=i: self.on_cid_paste(e, idx))
-            
             self.cid_entries.append(entry)
-            
-        # CID Actions Frame
-        cid_actions_frame = tk.Frame(cid_card, bg=COLOR_CARD, pady=5)
-        cid_actions_frame.pack(fill="x", pady=(5, 0))
+
+        # 4. Collapsible Manual Actions Panel
+        self.manual_visible = False
         
-        self.btn_capture_cid = self.create_styled_button(
-            cid_actions_frame, "Capture / Paste Confirmation ID", self.on_capture_cid_clicked, COLOR_ACCENT
-        )
-        self.btn_capture_cid.pack(side="left", padx=5)
+        toggle_frame = tk.Frame(main_container, bg=COLOR_BG)
+        toggle_frame.pack(fill="x", pady=(6, 1))
         
-        self.btn_copy_cid = self.create_styled_button(
-            cid_actions_frame, "Copy Confirmation ID", self.on_copy_cid_clicked, COLOR_CARD, has_border=True
+        self.toggle_btn = tk.Button(
+            toggle_frame, text="▶ Show Manual Fallbacks & Controls", command=self.toggle_manual_panel,
+            fg=COLOR_MUTED, bg=COLOR_BG, relief="flat", activebackground=COLOR_BG, activeforeground=COLOR_TEXT,
+            font=("Segoe UI", 9, "underline", "bold"), cursor="hand2", bd=0
         )
-        self.btn_copy_cid.pack(side="left", padx=5)
+        self.toggle_btn.pack(side="left")
         
-        self.btn_paste_office = self.create_styled_button(
-            cid_actions_frame, "Paste to Office Wizard", self.on_paste_office_clicked, COLOR_CARD, has_border=True
+        self.manual_panel = tk.Frame(main_container, bg=COLOR_BG)
+        # Packed dynamically inside toggle_manual_panel()
+        
+        # Build contents inside manual_panel
+        iid_act_frame = tk.LabelFrame(
+            self.manual_panel, text=" Manual IID ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
         )
-        self.btn_paste_office.pack(side="left", padx=5)
+        iid_act_frame.pack(side="left", fill="both", expand=True, padx=2)
+        
+        self.btn_capture_iid = self.create_styled_button(iid_act_frame, "Capture IID", self.on_capture_iid_clicked, COLOR_ACCENT)
+        self.btn_capture_iid.pack(fill="x", pady=2)
+        
+        self.btn_copy_iid = self.create_styled_button(iid_act_frame, "Copy IID", self.on_copy_iid_clicked, COLOR_CARD, has_border=True)
+        self.btn_copy_iid.pack(fill="x", pady=2)
+        
+        browser_act_frame = tk.LabelFrame(
+            self.manual_panel, text=" Manual Browser ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
+        )
+        browser_act_frame.pack(side="left", fill="both", expand=True, padx=2)
+        
+        self.btn_open_web = self.create_styled_button(browser_act_frame, "Open Portal Website", self.on_open_web_clicked, COLOR_ACCENT)
+        self.btn_open_web.pack(fill="x", pady=2)
+        
+        self.btn_fill_web = self.create_styled_button(browser_act_frame, "Fill Website Fields", self.on_fill_web_clicked, COLOR_CARD, has_border=True)
+        self.btn_fill_web.pack(fill="x", pady=2)
+        
+        cid_act_frame = tk.LabelFrame(
+            self.manual_panel, text=" Manual CID & Paste ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
+        )
+        cid_act_frame.pack(side="left", fill="both", expand=True, padx=2)
+        
+        self.btn_capture_cid = self.create_styled_button(cid_act_frame, "Scrape CID from Web", self.on_capture_cid_clicked, COLOR_ACCENT)
+        self.btn_capture_cid.pack(fill="x", pady=2)
+        
+        self.btn_copy_cid = self.create_styled_button(cid_act_frame, "Copy CID Text", self.on_copy_cid_clicked, COLOR_CARD, has_border=True)
+        self.btn_copy_cid.pack(fill="x", pady=2)
+        
+        self.btn_paste_office = self.create_styled_button(cid_act_frame, "Paste to Office Wizard", self.on_paste_office_clicked, COLOR_CARD, has_border=True)
+        self.btn_paste_office.pack(fill="x", pady=2)
         
         # 5. Log Output Card
-        log_card = tk.Frame(main_container, bg=COLOR_BG)
-        log_card.pack(fill="both", expand=True, pady=5)
+        self.log_card_container = tk.Frame(main_container, bg=COLOR_BG)
+        self.log_card_container.pack(fill="both", expand=True, pady=5)
         
-        log_header_frame = tk.Frame(log_card, bg=COLOR_BG)
+        log_header_frame = tk.Frame(self.log_card_container, bg=COLOR_BG)
         log_header_frame.pack(fill="x", pady=(0, 2))
         
         log_lbl = tk.Label(log_header_frame, text="Log Console", fg=COLOR_TEXT, bg=COLOR_BG, font=("Segoe UI", 10, "bold"))
@@ -258,10 +252,30 @@ class AppGui:
         self.btn_launch_sim.pack(side="right")
         
         self.log_text = scrolledtext.ScrolledText(
-            log_card, height=6, bg=COLOR_CARD, fg=COLOR_TEXT, relief="solid", bd=1,
+            self.log_card_container, height=6, bg=COLOR_CARD, fg=COLOR_TEXT, relief="solid", bd=1,
             font=("Consolas", 9), insertbackground=COLOR_TEXT, state="disabled"
         )
         self.log_text.pack(fill="both", expand=True)
+
+    def toggle_manual_panel(self):
+        if self.manual_visible:
+            self.manual_panel.pack_forget()
+            self.toggle_btn.config(text="▶ Show Manual Fallbacks & Controls")
+            self.manual_visible = False
+        else:
+            self.manual_panel.pack(fill="x", pady=5, before=self.log_card_container)
+            self.toggle_btn.config(text="▼ Hide Manual Fallbacks & Controls")
+            self.manual_visible = True
+
+    def on_start_auto_activation(self):
+        """
+        Runs the full automated workflow sequence:
+        1. Capture IID from Office Wizard window.
+        2. Validate IID.
+        3. If valid, immediately launch browser and start pipeline.
+        """
+        logger.info("Starting automated one-click activation sequence...")
+        self.on_capture_iid_clicked()
 
     def create_styled_button(self, parent, text, command, bg_color, has_border=False):
         """
@@ -539,6 +553,10 @@ class AppGui:
         else:
             self.update_status("IID Captured", "success")
             logger.info("Installation ID successfully loaded and validated.")
+            
+            # AUTOMATION TRANSITION: Launch browser immediately on successful OCR!
+            logger.info("IID captured successfully. Launching Browser activation portal automatically...")
+            self.on_open_web_clicked()
             
     def get_iid_list(self) -> list:
         return [entry.get().strip() for entry in self.iid_entries]
