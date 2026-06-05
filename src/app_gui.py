@@ -180,14 +180,14 @@ class AppGui:
             entry.bind("<<Paste>>", lambda e, idx=i: self.on_cid_paste(e, idx))
             self.cid_entries.append(entry)
 
-        # 4. Collapsible Manual Actions Panel
+        # 4. Collapsible Manual Actions & Logs Panel
         self.manual_visible = False
         
         toggle_frame = tk.Frame(main_container, bg=COLOR_BG)
         toggle_frame.pack(fill="x", pady=(6, 1))
         
         self.toggle_btn = tk.Button(
-            toggle_frame, text="▶ Show Manual Fallbacks & Controls", command=self.toggle_manual_panel,
+            toggle_frame, text="▶ Show Advanced Controls & Log Console", command=self.toggle_manual_panel,
             fg=COLOR_MUTED, bg=COLOR_BG, relief="flat", activebackground=COLOR_BG, activeforeground=COLOR_TEXT,
             font=("Segoe UI", 9, "underline", "bold"), cursor="hand2", bd=0
         )
@@ -196,9 +196,13 @@ class AppGui:
         self.manual_panel = tk.Frame(main_container, bg=COLOR_BG)
         # Packed dynamically inside toggle_manual_panel()
         
-        # Build contents inside manual_panel
+        # Sub-frame for action buttons (horizontal layout)
+        buttons_frame = tk.Frame(self.manual_panel, bg=COLOR_BG)
+        buttons_frame.pack(fill="x", pady=5)
+        
+        # Build contents inside buttons_frame
         iid_act_frame = tk.LabelFrame(
-            self.manual_panel, text=" Manual IID ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            buttons_frame, text=" Manual IID ", fg=COLOR_TEXT, bg=COLOR_CARD,
             bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
         )
         iid_act_frame.pack(side="left", fill="both", expand=True, padx=2)
@@ -210,7 +214,7 @@ class AppGui:
         self.btn_copy_iid.pack(fill="x", pady=2)
         
         browser_act_frame = tk.LabelFrame(
-            self.manual_panel, text=" Manual Browser ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            buttons_frame, text=" Manual Browser ", fg=COLOR_TEXT, bg=COLOR_CARD,
             bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
         )
         browser_act_frame.pack(side="left", fill="both", expand=True, padx=2)
@@ -222,7 +226,7 @@ class AppGui:
         self.btn_fill_web.pack(fill="x", pady=2)
         
         cid_act_frame = tk.LabelFrame(
-            self.manual_panel, text=" Manual CID & Paste ", fg=COLOR_TEXT, bg=COLOR_CARD,
+            buttons_frame, text=" Manual CID & Paste ", fg=COLOR_TEXT, bg=COLOR_CARD,
             bd=1, relief="solid", font=("Segoe UI", 9, "bold"), padx=5, pady=5
         )
         cid_act_frame.pack(side="left", fill="both", expand=True, padx=2)
@@ -236,8 +240,8 @@ class AppGui:
         self.btn_paste_office = self.create_styled_button(cid_act_frame, "Paste to Office Wizard", self.on_paste_office_clicked, COLOR_CARD, has_border=True)
         self.btn_paste_office.pack(fill="x", pady=2)
         
-        # 5. Log Output Card
-        self.log_card_container = tk.Frame(main_container, bg=COLOR_BG)
+        # 5. Log Output Card inside manual_panel
+        self.log_card_container = tk.Frame(self.manual_panel, bg=COLOR_BG)
         self.log_card_container.pack(fill="both", expand=True, pady=5)
         
         log_header_frame = tk.Frame(self.log_card_container, bg=COLOR_BG)
@@ -256,17 +260,17 @@ class AppGui:
             font=("Consolas", 9), insertbackground=COLOR_TEXT, state="disabled"
         )
         self.log_text.pack(fill="both", expand=True)
-
+ 
     def toggle_manual_panel(self):
         if self.manual_visible:
             self.manual_panel.pack_forget()
-            self.toggle_btn.config(text="▶ Show Manual Fallbacks & Controls")
+            self.toggle_btn.config(text="▶ Show Advanced Controls & Log Console")
             self.manual_visible = False
         else:
-            self.manual_panel.pack(fill="x", pady=5, before=self.log_card_container)
-            self.toggle_btn.config(text="▼ Hide Manual Fallbacks & Controls")
+            self.manual_panel.pack(fill="both", expand=True, pady=5)
+            self.toggle_btn.config(text="▼ Hide Advanced Controls & Log Console")
             self.manual_visible = True
-
+ 
     def on_start_auto_activation(self):
         """
         Runs the full automated workflow sequence:
