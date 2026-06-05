@@ -85,3 +85,81 @@ def register_gui_callback(callback):
     gui_handler.setLevel(logging.INFO)
     logger.addHandler(gui_handler)
     logger.info("GUI Logging connection established.")
+
+def log_system_diagnostics():
+    """
+    Queries and logs system information, display resolution, browser versions,
+    and active window titles to assist in troubleshooting across client machines.
+    """
+    logger.info("========================================")
+    logger.info("        SYSTEM DIAGNOSTICS LOG          ")
+    logger.info("========================================")
+    
+    # 1. OS & Architecture
+    try:
+        import platform
+        logger.info(f"OS Platform: {platform.platform()}")
+        logger.info(f"Architecture: {platform.machine()}")
+        logger.info(f"Python Version: {platform.python_version()}")
+    except Exception as e:
+        logger.warning(f"Failed to query OS info: {e}")
+
+    # 2. Display Resolution & DPI Settings
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        w = user32.GetSystemMetrics(0)
+        h = user32.GetSystemMetrics(1)
+        logger.info(f"Primary Resolution: {w}x{h}")
+        
+        try:
+            shcore = ctypes.windll.shcore
+            dpi_awareness = ctypes.c_int()
+            shcore.GetProcessDpiAwareness(-1, ctypes.byref(dpi_awareness))
+            logger.info(f"Process DPI Awareness Mode: {dpi_awareness.value}")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"Failed to query Display metrics: {e}")
+
+    # 3. Installed Browser Versions (via Registry)
+    try:
+        import winreg
+        browsers = {
+            "Google Chrome": (winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon", "version"),
+            "Microsoft Edge": (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon", "version")
+        }
+        for name, (hive, path, val_name) in browsers.items():
+            try:
+                with winreg.OpenKey(hive, path) as key:
+                    ver, _ = winreg.QueryValueEx(key, val_name)
+                    logger.info(f"{name} Version: {ver}")
+            except Exception:
+                try:
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as key:
+                        ver, _ = winreg.QueryValueEx(key, val_name)
+                        logger.info(f"{name} Version: {ver}")
+                except Exception:
+                    logger.info(f"{name}: Not detected in registry.")
+    except Exception as e:
+        logger.warning(f"Failed to query Browser registry: {e}")
+
+    # 4. Open Windows (titles of all visible windows)
+    try:
+        import win32gui
+        visible_windows = []
+        
+        def enum_win_titles(hwnd, extra):
+            if win32gui.IsWindowVisible(hwnd):
+                title = win32gui.GetWindowText(hwnd).strip()
+                if title:
+                    visible_windows.append(title)
+            return True
+            
+        win32gui.EnumWindows(enum_win_titles, None)
+        logger.info(f"Visible Window Titles: {visible_windows}")
+    except Exception as e:
+        logger.warning(f"Failed to query visible windows list: {e}")
+
+    logger.info("========================================")
+

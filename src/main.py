@@ -6,7 +6,7 @@ from tkinter import messagebox
 # Add current path to python path to resolve local imports cleanly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.logging_setup import logger
+from src.logging_setup import logger, log_system_diagnostics
 from src.app_gui import AppGui
 
 def check_environment():
@@ -40,6 +40,9 @@ def enable_dpi_awareness():
 def main():
     enable_dpi_awareness()
     logger.info("Initializing AutoActivateOffice Telephone Helper...")
+    
+    # Log detailed system specifications for debugging/diagnostics
+    log_system_diagnostics()
     
     # Pre-flight environment check
     check_environment()
