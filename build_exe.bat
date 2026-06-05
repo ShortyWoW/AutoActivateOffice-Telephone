@@ -32,8 +32,8 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
     )
 )
 
-echo Building portable directory structure using PyInstaller...
-pyinstaller --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
+echo Building portable single-file executable using PyInstaller...
+pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -43,8 +43,12 @@ if %ERRORLEVEL% EQU 0 (
     echo ============================================================
     echo.
     echo Creating directories in the distribution folder...
+    if not exist dist\AutoActivateOffice-Telephone mkdir dist\AutoActivateOffice-Telephone
     if not exist dist\AutoActivateOffice-Telephone\logs mkdir dist\AutoActivateOffice-Telephone\logs
     if not exist dist\AutoActivateOffice-Telephone\tesseract mkdir dist\AutoActivateOffice-Telephone\tesseract
+    
+    echo Moving single executable into the distribution folder...
+    move dist\AutoActivateOffice-Telephone.exe dist\AutoActivateOffice-Telephone\ >nul
     
     echo Copying local Tesseract binaries if present in project root...
     if exist tesseract\tesseract.exe (

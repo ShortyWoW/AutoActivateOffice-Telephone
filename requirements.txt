@@ -1,8 +1,7 @@
 selenium>=4.10.0
 pytesseract>=0.3.10
-opencv-python>=4.7.0.72
 pillow>=9.5.0
 pyperclip>=1.8.2
 pyautogui>=0.9.54
-pywinauto>=0.6.8
+pywin32>=306
 pyinstaller>=5.13.0

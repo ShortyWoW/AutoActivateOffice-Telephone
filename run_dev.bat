@@ -3,7 +3,7 @@ title AutoActivateOffice Telephone Helper - Dev Run
 cd /d "%~dp0"
 
 echo Verification of dependencies...
-python -c "import selenium, cv2, pytesseract, PIL, pyperclip, pyautogui, pywinauto" 2>nul
+python -c "import selenium, pytesseract, PIL, pyperclip, pyautogui, win32gui" 2>nul
 if %ERRORLEVEL% neq 0 (
     echo Missing packages. Attempting to install requirements...
     pip install -r requirements.txt

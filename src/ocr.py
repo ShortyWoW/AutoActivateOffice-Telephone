@@ -6,19 +6,13 @@ from src.logging_setup import logger
 from src.config import TESSERACT_SEARCH_PATHS, DIGITS_ONLY_RE, IID_TOTAL_DIGITS, IID_GROUPS, IID_DIGITS_PER_GROUP
 
 # Lazy load heavy dependencies to speed up application startup
-np = None
-cv2 = None
 pytesseract = None
 
 def _init_ocr_dependencies():
-    global np, cv2, pytesseract
+    global pytesseract
     if pytesseract is None:
-        logger.info("Lazy-loading heavy OCR dependencies (numpy, cv2, pytesseract)...")
-        import numpy as _np
-        import cv2 as _cv2
+        logger.info("Lazy-loading pytesseract...")
         import pytesseract as _pytesseract
-        np = _np
-        cv2 = _cv2
         pytesseract = _pytesseract
 
 # Initialize Tesseract executable path
@@ -148,44 +142,45 @@ class ScreenSniper:
         self.root.deiconify()
         self.callback(None)
 
-def preprocess_image(pil_img: Image.Image, is_window: bool = False) -> "np.ndarray":
+def preprocess_image(pil_img: Image.Image, is_window: bool = False) -> Image.Image:
     """
-    Applies OpenCV preprocessing to optimize image quality for OCR:
+    Applies Pillow preprocessing to optimize image quality for OCR:
     1. Grayscale
-    2. Cubic Resize (2.5x scale)
-    3. Bilateral filter for noise reduction
-    4. Otsu's Binary Thresholding
+    2. Bicubic Resize (2.5x scale)
+    3. Border Inversion (optional for dark snippets)
     """
-    _init_ocr_dependencies()
-    # Convert PIL Image to OpenCV Grayscale
-    open_cv_image = np.array(pil_img)
-    if len(open_cv_image.shape) == 3:
-        # Convert RGB to BGR first (since PIL is RGB and OpenCV functions expect BGR or Grayscale)
-        gray = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
-    else:
-        gray = open_cv_image
+    # Convert PIL Image to Grayscale
+    gray = pil_img.convert('L')
         
     # Enlarge the image (helps OCR on low-DPI screen text)
+    width, height = gray.size
     scale_factor = 2.5
-    resized = cv2.resize(gray, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
+    resized = gray.resize((int(width * scale_factor), int(height * scale_factor)), Image.Resampling.BICUBIC)
     
-    # Bilateral filter reduces noise while keeping edge details sharp
-    filtered = cv2.bilateralFilter(resized, 9, 75, 75)
-    
-    # Apply Otsu's thresholding to get a crisp black-and-white output
-    thresh = cv2.threshold(filtered, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    
-    # In some cases, a dark background with light text might need inversion.
-    # We will assume a light background by checking the mean value of the border pixels.
-    # If the border is mostly black, we invert the image.
-    # Skip inversion for full windows as standard window frames trigger false positives.
+    # Check if snippet has dark background and light text, and invert if so
     if not is_window:
-        h, w = thresh.shape
-        border_pixels = np.concatenate([thresh[0, :], thresh[-1, :], thresh[:, 0], thresh[:, -1]])
-        if np.mean(border_pixels) < 127:
-            thresh = cv2.bitwise_not(thresh)
+        try:
+            from PIL import ImageOps
+            # Check border pixels to determine background tone
+            pixels = resized.load()
+            w, h = resized.size
+            border_vals = []
+            
+            # Sample border pixels (edges)
+            for x in range(0, w, max(1, w // 10)):
+                border_vals.append(pixels[x, 0])
+                border_vals.append(pixels[x, h - 1])
+            for y in range(0, h, max(1, h // 10)):
+                border_vals.append(pixels[0, y])
+                border_vals.append(pixels[w - 1, y])
+                
+            mean_border = sum(border_vals) / len(border_vals)
+            if mean_border < 127:
+                resized = ImageOps.invert(resized)
+        except Exception as e:
+            logger.debug(f"Border tone check/inversion failed: {e}")
         
-    return thresh
+    return resized
 
 def perform_ocr(pil_img: Image.Image) -> list:
     """

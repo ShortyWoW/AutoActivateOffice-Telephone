@@ -42,13 +42,14 @@ jobs:
 
     - name: Build Executable with PyInstaller
       run: |
-        pyinstaller --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
+        pyinstaller --onefile --noconsole --noconfirm --name AutoActivateOffice-Telephone --clean --paths . --distpath ./dist --workpath ./build src/main.py
       shell: pwsh
 
     - name: Package Portable Directory Structure
       run: |
         New-Item -ItemType Directory -Force -Path dist\AutoActivateOffice-Telephone\Logs
         New-Item -ItemType Directory -Force -Path dist\AutoActivateOffice-Telephone\tesseract
+        Copy-Item -Path "dist\AutoActivateOffice-Telephone.exe" -Destination "dist\AutoActivateOffice-Telephone\"
         Copy-Item -Path "tesseract\*" -Destination "dist\AutoActivateOffice-Telephone\tesseract" -Recurse -Force
         Copy-Item -Path "README.md" -Destination "dist\AutoActivateOffice-Telephone\"
         Copy-Item -Path "requirements.txt" -Destination "dist\AutoActivateOffice-Telephone\"
