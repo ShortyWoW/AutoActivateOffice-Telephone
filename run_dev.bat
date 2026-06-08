@@ -2,21 +2,41 @@
 title AutoActivateOffice Telephone Helper - Dev Run
 cd /d "%~dp0"
 
+echo Checking for Python...
+where python >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Python is not installed or not in PATH. Please install Python.
+    pause
+    exit /b 1
+)
+
+echo Checking for virtual environment (.venv)...
+if not exist ".venv" (
+    echo Creating virtual environment...
+    python -m venv .venv
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] Failed to create virtual environment.
+        pause
+        exit /b %ERRORLEVEL%
+    )
+)
+
 echo Verification of dependencies...
-python -c "import selenium, pytesseract, PIL, pyperclip, pyautogui, win32gui" 2>nul
+.venv\Scripts\python -c "import selenium, pytesseract, PIL, pyperclip, pyautogui, win32gui" 2>nul
 if %ERRORLEVEL% neq 0 (
     echo Missing packages. Attempting to install requirements...
-    pip install -r requirements.txt
+    .venv\Scripts\python -m pip install --upgrade pip
+    .venv\Scripts\python -m pip install -r requirements.txt
     if %ERRORLEVEL% neq 0 (
         echo.
-        echo [ERROR] Failed to install dependencies. Please run "pip install -r requirements.txt" manually.
+        echo [ERROR] Failed to install dependencies.
         pause
         exit /b %ERRORLEVEL%
     )
 )
 
 echo Starting AutoActivateOffice Telephone Helper...
-python src/main.py
+.venv\Scripts\python src/main.py
 if %ERRORLEVEL% neq 0 (
     echo.
     echo [ERROR] Application exited with error code %ERRORLEVEL%.
