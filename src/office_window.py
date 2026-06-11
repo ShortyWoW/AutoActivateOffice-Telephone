@@ -83,8 +83,12 @@ def find_office_wizard_windows():
 def bring_window_to_front(hwnd):
     """
     Brings the window with specified handle to the front, restoring it if minimized.
+    Uses robust Win32 techniques (attaching thread input and sending dummy keyboard events)
+    to bypass OS foreground lock restrictions.
     """
     try:
+        import win32api
+        
         # Check if minimized
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
@@ -93,19 +97,67 @@ def bring_window_to_front(hwnd):
             
         # Avoid SetForegroundWindow deadlock if window belongs to our own process
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
-        if pid != os.getpid():
-            win32gui.SetForegroundWindow(hwnd)
-        else:
+        if pid == os.getpid():
             if _focus_callback:
                 _focus_callback(hwnd)
-            else:
+                logger.info(f"Focused local window (HWND: {hwnd}) via GUI focus callback.")
+                return True
+            
+        fore_hwnd = win32gui.GetForegroundWindow()
+        if fore_hwnd != hwnd:
+            target_thread, _ = win32process.GetWindowThreadProcessId(hwnd)
+            fore_thread, _ = win32process.GetWindowThreadProcessId(fore_hwnd)
+            curr_thread = win32api.GetCurrentThreadId()
+            
+            # Try Alt-key injection to bypass foreground restrictions
+            try:
+                ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)  # ALT down
+                ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)  # ALT up
+            except Exception as e:
+                logger.debug(f"Alt-key injection failed: {e}")
+                
+            attached = False
+            # Attach threads if they are different
+            if fore_thread != curr_thread and target_thread != curr_thread:
+                try:
+                    win32process.AttachThreadInput(fore_thread, curr_thread, True)
+                    win32process.AttachThreadInput(target_thread, curr_thread, True)
+                    attached = True
+                except Exception as e:
+                    logger.debug(f"AttachThreadInput failed: {e}")
+                    
+            try:
                 win32gui.SetForegroundWindow(hwnd)
+                win32gui.BringWindowToTop(hwnd)
+                try:
+                    win32gui.SetActiveWindow(hwnd)
+                except Exception:
+                    pass
+            finally:
+                if attached:
+                    try:
+                        win32process.AttachThreadInput(fore_thread, curr_thread, False)
+                        win32process.AttachThreadInput(target_thread, curr_thread, False)
+                    except Exception:
+                        pass
+        else:
+            # Already foreground, bring to top
+            try:
+                win32gui.BringWindowToTop(hwnd)
+            except Exception:
+                pass
             
         logger.info(f"Brought window (HWND: {hwnd}) to front.")
         return True
     except Exception as e:
         logger.error(f"Failed to bring window to front: {e}")
-        return False
+        # Fallback to simple ShowWindow
+        try:
+            win32gui.ShowWindow(hwnd, win32con.SW_SHOW)
+            win32gui.BringWindowToTop(hwnd)
+            return True
+        except Exception:
+            return False
 
 def capture_window_screenshot(hwnd):
     """
@@ -174,33 +226,17 @@ def auto_paste_confirmation_id(cid_groups: list) -> bool:
     logger.info(f"Auto-detected Office window: '{title}' (HWND: {hwnd})")
     
     if bring_window_to_front(hwnd):
-        # Small delay to let window focus settle
-        time.sleep(0.8)
+        # Wait 1.5 seconds to let window focus settle completely
+        time.sleep(1.5)
         
-        # Focus Box A by clicking it automatically
+        # Focus Box A by pressing TAB from the country dropdown
         try:
             import pyautogui
-            import win32gui
-            # Use true visual bounds (excluding DWM shadows) for exact coordinate calculation
-            bounds = get_extended_frame_bounds(hwnd)
-            if not bounds:
-                bounds = win32gui.GetWindowRect(hwnd)
-            x1, y1, x2, y2 = bounds
-            width = x2 - x1
-            height = y2 - y1
-            if width > 0 and height > 0:
-                # Baseline coordinates for a 620x560 window layout:
-                # Box A center: X = 103, Y = 344
-                click_x = int(x1 + (103 * (width / 620.0)))
-                click_y = int(y1 + (344 * (height / 560.0)))
-                
-                logger.info(f"Auto-clicking Box A at screen coordinates ({click_x}, {click_y}) to set focus...")
-                old_x, old_y = pyautogui.position()
-                pyautogui.click(click_x, click_y)
-                pyautogui.moveTo(old_x, old_y)
-                time.sleep(0.3)
+            logger.info("Sending TAB key press to navigate focus to Box A...")
+            pyautogui.press('tab')
+            time.sleep(0.5)
         except Exception as e:
-            logger.warning(f"Failed to auto-click Box A: {e}")
+            logger.warning(f"Failed to send TAB key press: {e}")
             
         # Paste the CID
         return paste_cid_to_focused_window(cid_groups)

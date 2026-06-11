@@ -49,8 +49,8 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
     )
 )
 
-echo Building portable single-file executable with bundled Tesseract and Icon using PyInstaller...
-.venv\Scripts\python -m PyInstaller --onefile --noconsole --noconfirm --name OfficePhoneActivator --clean --paths . --icon "assets/app_icon.ico" --add-data "tesseract;tesseract" --add-data "assets;assets" --distpath ./dist --workpath ./build src/main.py
+echo Building portable single-file executable with bundled Tesseract, Icon, and Splash Screen using PyInstaller spec...
+.venv\Scripts\python -m PyInstaller --clean --noconfirm --distpath ./dist --workpath ./build OfficePhoneActivator.spec
 
 if %ERRORLEVEL% EQU 0 (
     echo.

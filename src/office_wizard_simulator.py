@@ -36,9 +36,9 @@ class OfficeWizardSimulator(tk.Toplevel):
         # Build UI layout
         self.create_widgets()
         
-        # Auto-focus first entry
-        if self.cid_entries:
-            self.cid_entries[0].focus_set()
+        # Focus country dropdown on startup to match the real wizard
+        if hasattr(self, 'country_combo'):
+            self.country_combo.focus_set()
 
     def randomize_iid(self):
         """Generates 9 random groups of 7 digits."""

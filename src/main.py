@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import tkinter as tk
 from tkinter import messagebox
 
@@ -37,23 +38,62 @@ def enable_dpi_awareness():
         except Exception:
             pass
 
+def update_splash_progress(percentage: int, message: str):
+    """
+    Updates the PyInstaller splash screen progress text with a custom loading bar.
+    """
+    try:
+        import pyi_splash
+        # Create a text-based progress bar (30 characters max)
+        total_bars = 30
+        filled_bars = int(total_bars * (percentage / 100.0))
+        bar_str = "|" * filled_bars
+        spaces = " " * (total_bars - filled_bars)
+        progress_text = f"{message}\nLoading: [{bar_str}{spaces}] {percentage}%"
+        pyi_splash.update_text(progress_text)
+    except ImportError:
+        pass
+
 def main():
+    update_splash_progress(10, "Initializing core system...")
+    time.sleep(0.25)
+    
     enable_dpi_awareness()
+    update_splash_progress(35, "Configuring display adaptation...")
     logger.info("Initializing AutoActivateOffice Telephone Helper...")
+    time.sleep(0.25)
     
-    # Log detailed system specifications for debugging/diagnostics
-    log_system_diagnostics()
+    # Log detailed system specifications for debugging/diagnostics in a background thread
+    import threading
+    threading.Thread(target=log_system_diagnostics, daemon=True).start()
     
+    update_splash_progress(60, "Running pre-flight environment checks...")
     # Pre-flight environment check
     check_environment()
+    time.sleep(0.25)
     
+    update_splash_progress(80, "Building main application GUI...")
     # Initialize Tkinter root window
     root = tk.Tk()
+    time.sleep(0.25)
+    
+    update_splash_progress(95, "Starting interface modules...")
+    time.sleep(0.15)
     
     try:
         # Launch App
         app = AppGui(root)
         
+        update_splash_progress(100, "Ready!")
+        time.sleep(0.10)
+        
+        # Close PyInstaller splash screen if it exists
+        try:
+            import pyi_splash
+            pyi_splash.close()
+        except ImportError:
+            pass
+            
         # Intercept window close to clean up background browser sessions
         root.protocol("WM_DELETE_WINDOW", app.on_closing)
         

@@ -402,12 +402,12 @@ class AppGui:
                 win32gui.SetActiveWindow(hwnd)
                 logger.info(f"Focused local window (HWND: {hwnd}) on main thread.")
                 
-                # If it's our simulator window, also ensure the first entry has keyboard focus
+                # If it's our simulator window, ensure the country selection has focus to match the real wizard's initial state
                 if hasattr(self, 'simulator_window') and self.simulator_window and self.simulator_window.winfo_exists():
                     self.simulator_window.focus_force()
-                    if self.simulator_window.cid_entries:
-                        self.simulator_window.cid_entries[0].focus_set()
-                        logger.info("Focused the first Confirmation ID field in simulator.")
+                    if hasattr(self.simulator_window, 'country_combo'):
+                        self.simulator_window.country_combo.focus_set()
+                        logger.info("Focused the country selection combobox in simulator.")
         except Exception as e:
             logger.error(f"Error focusing local window on main thread: {e}")
 
