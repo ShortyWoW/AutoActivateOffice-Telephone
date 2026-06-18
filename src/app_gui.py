@@ -134,11 +134,11 @@ class AppGui:
         self.status_bar.pack(side="right")
         
         # Main container
-        main_container = tk.Frame(self.root, bg=COLOR_BG)
-        main_container.pack(fill="both", expand=True, padx=15, pady=5)
+        self.main_container = tk.Frame(self.root, bg=COLOR_BG)
+        self.main_container.pack(fill="both", expand=True, padx=15, pady=5)
         
         # 2. Primary Action Panel (One giant Start button)
-        primary_frame = tk.Frame(main_container, bg=COLOR_CARD, bd=1, relief="solid", pady=15)
+        primary_frame = tk.Frame(self.main_container, bg=COLOR_CARD, bd=1, relief="solid", pady=15)
         primary_frame.pack(fill="x", pady=5)
         
         self.btn_auto_activate = tk.Button(
@@ -164,7 +164,7 @@ class AppGui:
 
         # 3. Verification Fields Panel (Compact representation of captured numbers)
         fields_card = tk.LabelFrame(
-            main_container, text=" Verification Fields (Auto-Populated) ",
+            self.main_container, text=" Verification Fields (Auto-Populated) ",
             fg=COLOR_TEXT, bg=COLOR_CARD, bd=1, relief="solid", font=("Segoe UI", 10, "bold"),
             padx=10, pady=8
         )
@@ -225,7 +225,7 @@ class AppGui:
         # 4. Collapsible Manual Actions & Logs Panel
         self.manual_visible = False
         
-        toggle_frame = tk.Frame(main_container, bg=COLOR_BG)
+        toggle_frame = tk.Frame(self.main_container, bg=COLOR_BG)
         toggle_frame.pack(fill="x", pady=(6, 1))
         
         self.toggle_btn = tk.Button(
@@ -235,7 +235,7 @@ class AppGui:
         )
         self.toggle_btn.pack(side="left")
         
-        self.manual_panel = tk.Frame(main_container, bg=COLOR_BG)
+        self.manual_panel = tk.Frame(self.main_container, bg=COLOR_BG)
         # Packed dynamically inside toggle_manual_panel()
         
         # Sub-frame for action buttons (horizontal layout)
@@ -835,10 +835,13 @@ class AppGui:
         
         def paste_worker():
             try:
-                success = auto_paste_confirmation_id(groups)
-                if success:
-                    self.gui_queue.put(lambda: self.update_status("Office Activated", "success"))
-                    self.gui_queue.put(lambda: logger.info("Successfully pasted Confirmation ID to Office Activation Wizard."))
+                pasted, verified = auto_paste_confirmation_id(groups)
+                if pasted:
+                    if verified:
+                        self.gui_queue.put(lambda: self.show_success_page(groups))
+                    else:
+                        self.gui_queue.put(lambda: self.update_status("Pasted (Unverified)", "warning"))
+                        self.gui_queue.put(lambda: logger.info("Pasted Confirmation ID, but could not verify activation success via OCR."))
                 else:
                     self.gui_queue.put(lambda: self.update_status("Paste Failed", "warning"))
                     self.gui_queue.put(lambda: self.prompt_manual_paste(groups))
@@ -891,11 +894,132 @@ class AppGui:
                 self.root.after(1000, lambda: tick(sec - 1))
             else:
                 countdown_win.destroy()
-                # Run the typing sequence
-                paste_cid_to_focused_window(groups)
-                self.update_status("Pasted (Focused)", "success")
+                
+                # Run the typing sequence in a worker thread to keep UI interactive
+                def manual_paste_worker():
+                    try:
+                        paste_cid_to_focused_window(groups)
+                        self.gui_queue.put(lambda: self.update_status("Pasted (Focused)", "success"))
+                        
+                        import win32gui
+                        from src.office_window import find_office_wizard_windows, verify_and_complete_activation
+                        hwnd = win32gui.GetForegroundWindow()
+                        office_windows = find_office_wizard_windows()
+                        office_hwnds = [w[0] for w in office_windows]
+                        if hwnd in office_hwnds:
+                            logger.info(f"Active window HWND {hwnd} matches Office Wizard. Running verification...")
+                            verified = verify_and_complete_activation(hwnd)
+                            if verified:
+                                self.gui_queue.put(lambda: self.show_success_page(groups))
+                    except Exception as ex:
+                        logger.error(f"Manual paste worker crashed: {ex}", exc_info=True)
+                        
+                threading.Thread(target=manual_paste_worker, daemon=True).start()
                 
         self.root.after(1000, lambda: tick(4))
+
+    def show_success_page(self, cid_groups):
+        """
+        Hides the main container and shows a beautifully styled Success Page.
+        """
+        self.update_status("Office Activated", "success")
+        logger.info("Office Activation verified via OCR. Displaying Success Page...")
+        
+        # Hide main widgets container
+        self.main_container.pack_forget()
+        
+        # Create Success Frame if it doesn't exist, or recreate it
+        if hasattr(self, 'success_frame') and self.success_frame.winfo_exists():
+            self.success_frame.destroy()
+            
+        self.success_frame = tk.Frame(self.root, bg=COLOR_BG)
+        self.success_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        # Inner Card for success details
+        card = tk.Frame(self.success_frame, bg=COLOR_CARD, bd=1, relief="solid")
+        card.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Success Icon / Graphic (glowing green circle with checkmark)
+        canvas_size = int(80 * self.scale_factor)
+        canvas = tk.Canvas(card, width=canvas_size, height=canvas_size, bg=COLOR_CARD, highlightthickness=0)
+        canvas.pack(pady=(20, 10))
+        
+        # Draw checkmark circle
+        r = int(35 * self.scale_factor)
+        cx = canvas_size // 2
+        cy = canvas_size // 2
+        canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill="#1b4332", outline=COLOR_SUCCESS, width=3)
+        
+        # Draw checkmark lines
+        canvas.create_line(
+            cx - int(14 * self.scale_factor), cy + int(2 * self.scale_factor),
+            cx - int(4 * self.scale_factor), cy + int(12 * self.scale_factor),
+            cx + int(14 * self.scale_factor), cy - int(10 * self.scale_factor),
+            fill=COLOR_SUCCESS, width=4, capstyle="round", joinstyle="round"
+        )
+        
+        # Header text
+        success_lbl = tk.Label(
+            card, text="Office Activated Successfully!",
+            fg=COLOR_SUCCESS, bg=COLOR_CARD, font=("Segoe UI", 16, "bold")
+        )
+        success_lbl.pack(pady=5)
+        
+        desc_lbl = tk.Label(
+            card, text="The Activation Wizard has been verified and dismissed automatically.",
+            fg=COLOR_TEXT, bg=COLOR_CARD, font=("Segoe UI", 10)
+        )
+        desc_lbl.pack(pady=(0, 15))
+        
+        # Divider line
+        divider = tk.Frame(card, height=1, bg=COLOR_BORDER)
+        divider.pack(fill="x", padx=40, pady=10)
+        
+        # Details Panel
+        details_frame = tk.Frame(card, bg=COLOR_CARD)
+        details_frame.pack(fill="x", padx=40, pady=5)
+        
+        # Grid layout for alignment
+        details_frame.grid_columnconfigure(0, weight=1)
+        details_frame.grid_columnconfigure(1, weight=3)
+        
+        iid_text = " ".join(self.get_iid_list())
+        cid_text = " ".join(cid_groups)
+        
+        iid_lbl_title = tk.Label(details_frame, text="Installation ID:", fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 9, "bold"), anchor="e")
+        iid_lbl_title.grid(row=0, column=0, sticky="e", pady=4)
+        iid_lbl_val = tk.Label(details_frame, text=iid_text, fg=COLOR_TEXT, bg=COLOR_CARD, font=("Consolas", 9), anchor="w", justify="left")
+        iid_lbl_val.grid(row=0, column=1, sticky="w", padx=10, pady=4)
+        
+        cid_lbl_title = tk.Label(details_frame, text="Confirmation ID:", fg=COLOR_MUTED, bg=COLOR_CARD, font=("Segoe UI", 9, "bold"), anchor="e")
+        cid_lbl_title.grid(row=1, column=0, sticky="e", pady=4)
+        cid_lbl_val = tk.Label(details_frame, text=cid_text, fg=COLOR_TEXT, bg=COLOR_CARD, font=("Consolas", 9), anchor="w", justify="left")
+        cid_lbl_val.grid(row=1, column=1, sticky="w", padx=10, pady=4)
+        
+        # Back / Restart button
+        btn_back = self.create_styled_button(
+            card, "Activate Another Copy", self.hide_success_page, COLOR_ACCENT
+        )
+        btn_back.pack(pady=20)
+        
+    def hide_success_page(self):
+        """
+        Hides the Success Page and restores the main widgets view.
+        """
+        if hasattr(self, 'success_frame') and self.success_frame.winfo_exists():
+            self.success_frame.pack_forget()
+        
+        # Restore main container
+        self.main_container.pack(fill="both", expand=True, padx=15, pady=5)
+        
+        # Reset entry fields for next activation
+        for entry in self.iid_entries:
+            entry.delete(0, tk.END)
+        for entry in self.cid_entries:
+            entry.delete(0, tk.END)
+            
+        self.update_status("Ready", "normal")
+        logger.info("Returned to main activation screen. Entry fields cleared.")
 
     def on_launch_simulator_clicked(self):
         """
@@ -914,3 +1038,4 @@ class AppGui:
         except Exception:
             pass
         self.root.destroy()
+

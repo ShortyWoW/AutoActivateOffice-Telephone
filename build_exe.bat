@@ -15,8 +15,9 @@ if %ERRORLEVEL% neq 0 (
 )
 
 echo Checking for virtual environment (.venv)...
-if not exist ".venv" (
-    echo Creating virtual environment...
+if not exist ".venv\Scripts\python.exe" (
+    echo Virtual environment missing or incomplete. Creating virtual environment...
+    if exist ".venv" rmdir /s /q .venv
     python -m venv .venv
     if %ERRORLEVEL% neq 0 (
         echo [ERROR] Failed to create virtual environment.

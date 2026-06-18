@@ -368,3 +368,21 @@ def auto_detect_and_ocr() -> list:
     except Exception as e:
         logger.error(f"Error during auto-window OCR: {e}")
         return None
+
+def perform_text_ocr(pil_img: Image.Image) -> str:
+    """
+    Performs OCR on the image without a digits whitelist to extract general text.
+    """
+    if not init_tesseract():
+        logger.error("OCR canceled: Tesseract binary is not configured.")
+        return ""
+    try:
+        processed_img = preprocess_image(pil_img, is_window=True)
+        config = r'--psm 3'
+        ocr_result = pytesseract.image_to_string(processed_img, config=config)
+        logger.info(f"Raw Text OCR Output: {repr(ocr_result)}")
+        return ocr_result
+    except Exception as e:
+        logger.error(f"Error performing text OCR: {e}")
+        return ""
+

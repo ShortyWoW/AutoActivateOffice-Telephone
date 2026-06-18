@@ -210,16 +210,70 @@ def paste_cid_to_focused_window(cid_groups: list, delay_between_chars: float = 0
     logger.info("Finished typing Confirmation ID.")
     return True
 
-def auto_paste_confirmation_id(cid_groups: list) -> bool:
+def verify_and_complete_activation(hwnd) -> bool:
     """
-    Finds the Office Activation Wizard, brings it to front, focuses Box A, and types the CID.
-    If no window is found, logs a warning and returns False.
+    After typing the Confirmation ID, submits the wizard, verifies activation via OCR,
+    and closes/dismisses the window if successful.
+    Returns True if activation was verified and dismissed, False otherwise.
+    """
+    import pyautogui
+    from src.ocr import perform_text_ocr
+    
+    # Step 1: Wait 1 second after pasting, then press Enter
+    logger.info("Waiting 1.0 second before submitting Confirmation ID...")
+    time.sleep(1.0)
+    logger.info("Pressing Enter to submit Confirmation ID...")
+    pyautogui.press('enter')
+    
+    # Step 2: Wait 1.5 seconds for window transition
+    logger.info("Waiting 1.5 seconds for activation screen to render...")
+    time.sleep(1.5)
+    
+    # Step 3: Capture screenshot of the window
+    screenshot = capture_window_screenshot(hwnd)
+    if screenshot is None:
+        logger.warning("Failed to capture window screenshot for activation verification.")
+        return False
+        
+    # Step 4: OCR scan the window text
+    logger.info("Performing OCR scan on Wizard window to verify activation status...")
+    ocr_text = perform_text_ocr(screenshot)
+    logger.info(f"OCR Scanned Window Text:\n{ocr_text}")
+    
+    # Step 5: Check if success message is found
+    text_lower = ocr_text.lower()
+    
+    # Check for keywords indicating success
+    is_success = False
+    if "you have activated office" in text_lower or ("activated" in text_lower and "office" in text_lower):
+        logger.info("OCR scan detected 'You have activated Office' success phrase!")
+        is_success = True
+    elif "activated" in text_lower:
+        logger.info("OCR scan detected 'activated' success keyword. Assuming activation succeeded.")
+        is_success = True
+        
+    if is_success:
+        # Step 6: Wait 1 second, then press Enter again to close/dismiss
+        logger.info("Waiting 1.0 second before dismissing the successful activation window...")
+        time.sleep(1.0)
+        logger.info("Pressing Enter to close/dismiss the Activation Wizard...")
+        pyautogui.press('enter')
+        return True
+    else:
+        logger.warning("Activation success text not found in OCR scan. Let technician take over.")
+        return False
+
+def auto_paste_confirmation_id(cid_groups: list) -> tuple:
+    """
+    Finds the Office Activation Wizard, brings it to front, focuses Box A, types the CID,
+    submits it, verifies activation via OCR, and closes it if successful.
+    Returns a tuple: (pasted_successfully, activation_verified)
     """
     matches = find_office_wizard_windows()
     
     if not matches:
         logger.warning("Microsoft Office Activation Wizard window was not auto-detected.")
-        return False
+        return False, False
         
     # Take the first match
     hwnd, title = matches[0]
@@ -239,6 +293,13 @@ def auto_paste_confirmation_id(cid_groups: list) -> bool:
             logger.warning(f"Failed to send TAB key press: {e}")
             
         # Paste the CID
-        return paste_cid_to_focused_window(cid_groups)
+        pasted = paste_cid_to_focused_window(cid_groups)
+        if not pasted:
+            return False, False
+            
+        # Verify and complete the activation
+        verified = verify_and_complete_activation(hwnd)
+        return True, verified
     
-    return False
+    return False, False
+

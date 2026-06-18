@@ -39,6 +39,9 @@ class OfficeWizardSimulator(tk.Toplevel):
         # Focus country dropdown on startup to match the real wizard
         if hasattr(self, 'country_combo'):
             self.country_combo.focus_set()
+            
+        # Bind Return key to Next button
+        self.bind("<Return>", lambda e: self.on_next())
 
     def randomize_iid(self):
         """Generates 9 random groups of 7 digits."""
@@ -255,20 +258,46 @@ class OfficeWizardSimulator(tk.Toplevel):
             "Use it to train technicians on configuring telephone activations or verifying OCR capture."
         )
 
-    def on_next(self):
+    def on_next(self, event=None):
         full_cid = "".join(e.get().strip() for e in self.cid_entries)
         if len(full_cid) == 48:
-            messagebox.showinfo(
-                "Microsoft Office Activation",
-                "Products activated successfully.\n\n"
-                "Thank you for using Microsoft Office."
-            )
-            self.destroy()
+            self.show_success_screen()
         else:
             messagebox.showwarning(
                 "Microsoft Office Activation",
                 "The Confirmation ID entered is incomplete. It must consist of 8 groups of 6 digits (48 digits total)."
             )
+
+    def show_success_screen(self):
+        """
+        Mimics the final success screen of the real Office Activation Wizard.
+        """
+        # Create a frame that covers the upper content area
+        success_frame = tk.Frame(self, bg="#ffffff")
+        success_frame.place(x=0, y=80, width=620, height=420)
+        
+        # Success title
+        success_title = tk.Label(
+            success_frame, text="Thank you. Your copy of Microsoft Office has been activated.",
+            fg="#000000", bg="#ffffff", font=("Segoe UI", 10, "bold"), anchor="w", justify="left"
+        )
+        success_title.pack(anchor="w", padx=20, pady=20)
+        
+        # Success description
+        success_desc = tk.Label(
+            success_frame, 
+            text="Products activated successfully.\n"
+                 "You have activated Office.\n\n"
+                 "Please click Close to exit the Activation Wizard.",
+            fg="#202020", bg="#ffffff", font=("Segoe UI", 9), anchor="w", justify="left"
+        )
+        success_desc.pack(anchor="w", padx=20, pady=10)
+        
+        # Change the Next button in the footer to "Close"
+        self.btn_next.config(text="Close", command=self.destroy)
+        
+        # Rebind Return key to Close (destroy)
+        self.bind("<Return>", lambda e: self.destroy())
 
     # --- Auto-tabbing and tabbing handling ---
 

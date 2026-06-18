@@ -23,3 +23,6 @@ Tesseract-OCR/
 # Temp files
 temp/
 
+# Virtual Environment
+.venv/
+

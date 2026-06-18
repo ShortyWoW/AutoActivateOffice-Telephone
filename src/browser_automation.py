@@ -72,11 +72,23 @@ class BrowserController:
             options.page_load_strategy = 'eager'
             options.add_argument("--start-maximized")
             options.add_argument("--disable-gpu")
+            options.add_argument("--disable-blink-features=AutomationControlled")
+            options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            options.add_experimental_option('useAutomationExtension', False)
             # Clear user profile data to ensure clean login environment
             options.add_argument("--incognito")  # Chrome uses incognito, Edge uses inprivate
             options.add_argument("-inprivate")
             
             self.driver = webdriver.Edge(options=options)
+            
+            # Hide navigator.webdriver flag via CDP
+            try:
+                self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                    "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+                })
+            except Exception as cdp_err:
+                logger.debug(f"Failed to set CDP webdriver override on Edge: {cdp_err}")
+                
             logger.info("Successfully launched Microsoft Edge.")
         except Exception as edge_err:
             logger.warning(f"Failed to launch Edge: {edge_err}. Attempting Google Chrome fallback...")
@@ -87,9 +99,21 @@ class BrowserController:
                 options.page_load_strategy = 'eager'
                 options.add_argument("--start-maximized")
                 options.add_argument("--disable-gpu")
+                options.add_argument("--disable-blink-features=AutomationControlled")
+                options.add_experimental_option("excludeSwitches", ["enable-automation"])
+                options.add_experimental_option('useAutomationExtension', False)
                 options.add_argument("--incognito")
                 
                 self.driver = webdriver.Chrome(options=options)
+                
+                # Hide navigator.webdriver flag via CDP
+                try:
+                    self.driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+                    })
+                except Exception as cdp_err:
+                    logger.debug(f"Failed to set CDP webdriver override on Chrome: {cdp_err}")
+                    
                 logger.info("Successfully launched Google Chrome.")
             except Exception as chrome_err:
                 logger.error(f"Failed to launch Chrome fallback: {chrome_err}")
